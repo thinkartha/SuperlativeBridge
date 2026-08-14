@@ -2,15 +2,79 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Candidate } from "@/types/api";
 
-/** Rough continental-US projection for demo map pins. */
-function project(lat: number, lng: number, w: number, h: number) {
-  const x = ((lng + 125) / 58) * w;
-  const y = ((49.5 - lat) / 25) * h;
-  return {
-    x: Math.min(w - 8, Math.max(8, x)),
-    y: Math.min(h - 8, Math.max(8, y)),
-  };
+export type MapRegion = "us" | "ethiopia";
+
+const US_W = 959;
+const US_H = 593;
+
+/** Matches public/ethiopia.svg (Natural Earth 10m, equirectangular). */
+const ET_W = 800;
+const ET_H = 900;
+const ET_WEST = 32.6389298892989;
+const ET_EAST = 48.329479794797955;
+const ET_SOUTH = 3.053040251793527;
+const ET_NORTH = 15.230299955186231;
+
+/**
+ * Contiguous-US Albers equal-area (matches public/us-states.svg).
+ */
+function projectAlbersUsa(lat: number, lng: number) {
+  if (lat < 24 || lat > 50 || lng < -125 || lng > -66) {
+    return null;
+  }
+
+  const φ0 = (29.5 * Math.PI) / 180;
+  const φ1 = (45.5 * Math.PI) / 180;
+  const λ0 = (-96 * Math.PI) / 180;
+  const φc = (38 * Math.PI) / 180;
+  const φ = (lat * Math.PI) / 180;
+  const λ = (lng * Math.PI) / 180;
+
+  const n = (Math.sin(φ0) + Math.sin(φ1)) / 2;
+  const C = Math.cos(φ0) ** 2 + 2 * n * Math.sin(φ0);
+  const ρ0 = Math.sqrt(C - 2 * n * Math.sin(φc)) / n;
+  const θ = n * (λ - λ0);
+  const ρ = Math.sqrt(Math.max(0, C - 2 * n * Math.sin(φ))) / n;
+
+  const x = ρ * Math.sin(θ);
+  const y = ρ0 - ρ * Math.cos(θ);
+
+  const scale = 1070;
+  const px = 480 + scale * x;
+  const py = 250 - scale * y;
+
+  if (px < 20 || px > US_W - 20 || py < 10 || py > US_H - 10) {
+    return null;
+  }
+  return { x: px, y: py };
 }
+
+function projectEthiopia(lat: number, lng: number) {
+  if (lat < ET_SOUTH || lat > ET_NORTH || lng < ET_WEST || lng > ET_EAST) {
+    return null;
+  }
+  const x = ((lng - ET_WEST) / (ET_EAST - ET_WEST)) * ET_W;
+  const y = ((ET_NORTH - lat) / (ET_NORTH - ET_SOUTH)) * ET_H;
+  if (x < 8 || x > ET_W - 8 || y < 8 || y > ET_H - 8) {
+    return null;
+  }
+  return { x, y };
+}
+
+function isInRegion(c: Candidate, region: MapRegion): boolean {
+  if (typeof c.lat !== "number" || typeof c.lng !== "number") return false;
+  if (region === "us") {
+    return c.lat >= 24 && c.lat <= 50 && c.lng >= -125 && c.lng <= -66;
+  }
+  return (
+    c.lat >= ET_SOUTH &&
+    c.lat <= ET_NORTH &&
+    c.lng >= ET_WEST &&
+    c.lng <= ET_EAST
+  );
+}
+
+type Pin = Candidate & { x: number; y: number };
 
 export default function GigWorkerMap({
   candidates,
@@ -19,99 +83,179 @@ export default function GigWorkerMap({
   candidates: Candidate[];
   onSelect?: (id: string) => void;
 }) {
-  const [hoverId, setHoverId] = useState<string>("");
-  const w = 720;
-  const h = 420;
+  const [region, setRegion] = useState<MapRegion>("us");
+  const [hoverId, setHoverId] = useState("");
 
-  const pins = useMemo(
-    () =>
-      candidates
-        .filter((c) => typeof c.lat === "number" && typeof c.lng === "number")
-        .map((c) => ({
-          ...c,
-          ...project(c.lat as number, c.lng as number, w, h),
-        })),
+  const mapW = region === "us" ? US_W : ET_W;
+  const mapH = region === "us" ? US_H : ET_H;
+
+  const usCount = useMemo(
+    () => candidates.filter((c) => isInRegion(c, "us")).length,
+    [candidates],
+  );
+  const etCount = useMemo(
+    () => candidates.filter((c) => isInRegion(c, "ethiopia")).length,
     [candidates],
   );
 
+  const pins: Pin[] = useMemo(() => {
+    const out: Pin[] = [];
+    const project = region === "us" ? projectAlbersUsa : projectEthiopia;
+    for (const c of candidates) {
+      if (!isInRegion(c, region)) continue;
+      const pt = project(c.lat!, c.lng!);
+      if (!pt) continue;
+      out.push({ ...c, ...pt });
+    }
+    return out;
+  }, [candidates, region]);
+
   const hover = pins.find((p) => p.id === hoverId);
+
+  const byPlace = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of pins) {
+      const place = (p.location || "").split(",")[0]?.trim() || "—";
+      counts.set(place, (counts.get(place) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  }, [pins]);
 
   return (
     <div className="border border-border bg-card overflow-hidden">
-      <div className="px-5 py-3 border-b border-border flex items-center justify-between gap-3">
+      <div className="px-5 py-3 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-sm font-heading font-semibold text-foreground">
-            GIG workers across the US
+            GIG workers · {region === "us" ? "United States" : "Ethiopia"}
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {pins.length} candidates with location · click a pin to open profile
+            {pins.length} located candidates · hover a pin for details
           </p>
         </div>
-      </div>
-      <div className="relative bg-muted/30 p-3 lg:p-4">
-        <svg
-          viewBox={`0 0 ${w} ${h}`}
-          className="w-full h-auto max-h-[420px] text-foreground"
-          role="img"
-          aria-label="Map of GIG worker locations in the United States"
-        >
-          <rect width={w} height={h} className="fill-background" />
-          {/* Simplified continental US outline */}
-          <path
-            d="M 90 90 L 160 70 L 250 55 L 340 50 L 430 55 L 520 70 L 580 95 L 620 140 L 640 190 L 630 250 L 600 300 L 540 340 L 470 360 L 400 370 L 330 365 L 260 350 L 200 320 L 150 280 L 110 230 L 85 170 Z"
-            className="fill-muted/60 stroke-border"
-            strokeWidth="2"
-          />
-          {/* Great Lakes hint */}
-          <ellipse cx="480" cy="140" rx="28" ry="16" className="fill-background/80 stroke-border" strokeWidth="1" />
-          <ellipse cx="520" cy="155" rx="18" ry="12" className="fill-background/80 stroke-border" strokeWidth="1" />
-          {/* Florida */}
-          <path
-            d="M 560 300 L 580 330 L 575 360 L 555 345 Z"
-            className="fill-muted/60 stroke-border"
-            strokeWidth="1.5"
-          />
-          {/* Texas bulge */}
-          <path
-            d="M 280 300 L 340 295 L 360 340 L 300 350 Z"
-            className="fill-muted/40 stroke-border"
-            strokeWidth="1"
-          />
 
-          {pins.map((p) => (
-            <g key={p.id}>
-              <Link to={`/employer/candidate/${p.id}`}>
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r={hoverId === p.id ? 8 : 5.5}
-                  className="fill-primary stroke-background cursor-pointer"
-                  strokeWidth="1.5"
-                  onMouseEnter={() => setHoverId(p.id)}
-                  onMouseLeave={() => setHoverId("")}
-                  onClick={() => onSelect?.(p.id)}
-                />
-              </Link>
-            </g>
-          ))}
-        </svg>
+        <div className="flex items-center gap-3 flex-wrap">
+          {byPlace.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {byPlace.map(([place, n]) => (
+                <span
+                  key={place}
+                  className="text-[11px] px-2 py-0.5 bg-muted text-muted-foreground border border-border"
+                >
+                  {place} · {n}
+                </span>
+              ))}
+            </div>
+          )}
 
-        {hover && (
-          <div className="absolute left-4 bottom-4 right-4 sm:right-auto sm:max-w-xs border border-border bg-card p-3 shadow-sm">
-            <p className="text-sm font-medium text-foreground">{hover.name}</p>
-            <p className="text-xs text-muted-foreground">{hover.title}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {hover.location}
-              {hover.visaStatus ? ` · ${hover.visaStatus}` : ""}
-            </p>
-            <Link
-              to={`/employer/candidate/${hover.id}`}
-              className="text-xs text-primary mt-2 inline-block hover:underline"
+          <div
+            className="inline-flex border border-border bg-muted/40 p-0.5"
+            role="group"
+            aria-label="Map region"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setRegion("us");
+                setHoverId("");
+              }}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                region === "us"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
-              View profile & resume
-            </Link>
+              US
+              <span className="ml-1.5 tabular-nums opacity-70">{usCount}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRegion("ethiopia");
+                setHoverId("");
+              }}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                region === "ethiopia"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Ethiopia
+              <span className="ml-1.5 tabular-nums opacity-70">{etCount}</span>
+            </button>
           </div>
-        )}
+        </div>
+      </div>
+
+      <div className="relative bg-background">
+        <div
+          className="relative w-full mx-auto max-h-[520px]"
+          style={{ aspectRatio: `${mapW} / ${mapH}` }}
+        >
+          <img
+            src={region === "us" ? "/us-states.svg" : "/ethiopia.svg"}
+            alt={region === "us" ? "United States map" : "Ethiopia map"}
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none dark:invert dark:opacity-90"
+            draggable={false}
+          />
+
+          <svg
+            viewBox={`0 0 ${mapW} ${mapH}`}
+            className="absolute inset-0 w-full h-full"
+            role="img"
+            aria-label="GIG worker locations"
+          >
+            {pins.map((p) => {
+              const active = hoverId === p.id;
+              return (
+                <g key={p.id}>
+                  <Link to={`/employer/candidate/${p.id}`}>
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={active ? 9 : 6}
+                      className="fill-primary/25 stroke-none"
+                    />
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={active ? 5.5 : 4}
+                      className="fill-primary stroke-background cursor-pointer"
+                      strokeWidth={1.5}
+                      onMouseEnter={() => setHoverId(p.id)}
+                      onMouseLeave={() => setHoverId("")}
+                      onClick={() => onSelect?.(p.id)}
+                    />
+                  </Link>
+                </g>
+              );
+            })}
+          </svg>
+
+          {hover && (
+            <div className="absolute left-3 bottom-3 right-3 sm:right-auto sm:max-w-xs border border-border bg-card/95 backdrop-blur-sm p-3 shadow-sm z-10">
+              <p className="text-sm font-medium text-foreground">{hover.name}</p>
+              <p className="text-xs text-muted-foreground">{hover.title}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {hover.location}
+                {hover.visaStatus ? ` · ${hover.visaStatus}` : ""}
+              </p>
+              <Link
+                to={`/employer/candidate/${hover.id}`}
+                className="text-xs text-primary mt-2 inline-block hover:underline"
+              >
+                View profile & resume
+              </Link>
+            </div>
+          )}
+
+          {pins.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <p className="text-sm text-muted-foreground bg-card/90 border border-border px-4 py-2">
+                No located candidates in this region
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

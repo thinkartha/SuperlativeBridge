@@ -66,6 +66,47 @@ aws cloudformation deploy \
 
 rm -f "$TMP"
 
+# Compose full Postgres DSN into DatabaseUrlSecret (replaces former Custom Resource).
+out() {
+  aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$AWS_REGION" \
+    --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+}
+DB_SECRET_ARN="$(out DbSecretArn)"
+URL_SECRET_ARN="$(out DatabaseUrlSecretArn)"
+DB_HOST="$(out DbEndpoint)"
+DB_PORT="$(out DbPort)"
+if [[ -n "$DB_SECRET_ARN" && "$DB_SECRET_ARN" != "None" && -n "$URL_SECRET_ARN" && "$URL_SECRET_ARN" != "None" ]]; then
+  echo "Composing DATABASE_URL secret from RDS credentials…"
+  CRED_JSON=$(aws secretsmanager get-secret-value --secret-id "$DB_SECRET_ARN" --region "$AWS_REGION" \
+    --query SecretString --output text)
+  URL_JSON=$(aws secretsmanager get-secret-value --secret-id "$URL_SECRET_ARN" --region "$AWS_REGION" \
+    --query SecretString --output text 2>/dev/null || echo '{}')
+  PAYLOAD=$(CRED_JSON="$CRED_JSON" URL_JSON="$URL_JSON" DB_HOST="$DB_HOST" DB_PORT="${DB_PORT:-5432}" python3 - <<'PY'
+import json, os, urllib.parse
+cred = json.loads(os.environ["CRED_JSON"])
+existing = json.loads(os.environ.get("URL_JSON") or "{}")
+dbname = existing.get("dbname") or "superlativebridge"
+host = os.environ["DB_HOST"]
+port = os.environ["DB_PORT"]
+user = urllib.parse.quote(cred["username"], safe="")
+pwd = urllib.parse.quote(cred["password"], safe="")
+dsn = f"postgres://{user}:{pwd}@{host}:{port}/{dbname}?sslmode=require"
+print(json.dumps({
+    "dsn": dsn,
+    "host": host,
+    "port": str(port),
+    "dbname": dbname,
+    "username": cred["username"],
+}))
+PY
+)
+  aws secretsmanager put-secret-value \
+    --secret-id "$URL_SECRET_ARN" \
+    --region "$AWS_REGION" \
+    --secret-string "$PAYLOAD" >/dev/null
+  echo "DatabaseUrlSecret updated"
+fi
+
 echo "Infra stack outputs:"
 aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$AWS_REGION" \
   --query 'Stacks[0].Outputs' --output table

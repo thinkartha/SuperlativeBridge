@@ -228,7 +228,7 @@ INSERT INTO entrepreneurship_resources (category, title, description, icon, item
 INSERT INTO candidates (name, title, skills, location, zip, billing_rate, vertical, education, programs, rating, experience, email) VALUES
 ('Maria Garcia','Full Stack Developer',ARRAY['React','Python','AWS']::text[],'Houston, TX','77001',85,'Information Technology','BS Computer Science',ARRAY['WOTC','HUBZone']::text[],4.9,'5 years','maria@example.com'),
 ('James Wilson','Data Analyst',ARRAY['Python','SQL','Tableau']::text[],'Chicago, IL','60601',70,'Information Technology','MS Data Science',ARRAY['Veterans','WOTC']::text[],4.7,'3 years','james@example.com'),
-('Aisha Patel','Project Manager',ARRAY['Agile','Scrum','Leadership']::text[],'San Jose, CA','95101',95,'Professional Services','MBA',ARRAY['MWBE']::text[],4.8,'8 years','aisha.candidate@example.com'),
+('Liya Mengistu','Project Manager',ARRAY['Agile','Scrum','Leadership']::text[],'San Jose, CA','95101',95,'Professional Services','MBA',ARRAY['MWBE']::text[],4.8,'8 years','aisha.candidate@example.com'),
 ('Carlos Mendez','Electrician',ARRAY['Electrical','HVAC','Safety']::text[],'Miami, FL','33101',55,'Construction','Trade Certificate',ARRAY['WOTC','HUBZone']::text[],4.6,'12 years','carlos@example.com'),
 ('Sarah Chen','UX Designer',ARRAY['Figma','Research','Prototyping']::text[],'Seattle, WA','98101',90,'Information Technology','BFA Design','{}'::text[],4.9,'4 years','sarah@example.com'),
 ('David Brown','Cybersecurity Analyst',ARRAY['Network Security','SIEM','Python']::text[],'Austin, TX','73301',100,'Information Technology','BS Cybersecurity',ARRAY['Veterans']::text[],4.5,'6 years','david.brown@example.com'),

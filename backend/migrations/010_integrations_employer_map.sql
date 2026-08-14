@@ -168,7 +168,7 @@ SKILLS
 Python, SQL, Tableau
 $r$),
   ('aisha.candidate@example.com', 'H-1B', 37.3382, -121.8863,
-   $r$AISHA PATEL
+   $r$LIYA MENGISTU
 San Jose, CA · aisha.candidate@example.com
 Visa: H-1B
 
@@ -228,7 +228,7 @@ SUMMARY
 Machine learning engineer for NLP and TensorFlow systems.
 $r$),
   ('priya.sharma@example.com', 'H-1B', 32.7767, -96.7970,
-   $r$PRIYA SHARMA
+   $r$BETHLEHEM WORKU
 Dallas, TX · priya.sharma@example.com
 Visa: H-1B
 

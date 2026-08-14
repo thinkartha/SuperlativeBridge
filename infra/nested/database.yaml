@@ -88,83 +88,19 @@ Resources:
         - Key: Name
           Value: !Sub sb-${Environment}-rds
 
+  # Host metadata only. Full DSN (with password) is written by scripts/deploy-infra.sh
+  # after the stack is CREATE/UPDATE_COMPLETE — avoids a Custom Resource that
+  # commonly DELETE_FAILS when its Lambda is already gone during rollback.
   DatabaseUrlSecret:
     Type: AWS::SecretsManager::Secret
     DependsOn: DbInstance
     Properties:
       Name: !Sub superlativebridge/${Environment}/database-url
-      Description: >
-        Full Postgres DSN. Populated by deploy pipeline after RDS is ready
-        (compose from DbSecret + endpoint). Seed value uses host placeholder.
+      Description: Full Postgres DSN (populated by deploy-infra.sh after RDS is ready)
       SecretString: !Sub
-        - '{"dsn":"postgres://PLACEHOLDER@${Host}:5432/${Db}?sslmode=require","host":"${Host}","port":"5432","dbname":"${Db}"}'
+        - '{"dsn":"","host":"${Host}","port":"5432","dbname":"${Db}"}'
         - Host: !GetAtt DbInstance.Endpoint.Address
           Db: !Ref DbName
-
-  ComposeDatabaseUrl:
-    Type: AWS::CloudFormation::CustomResource
-    DependsOn: [DbInstance, DbSecret]
-    Properties:
-      ServiceToken: !GetAtt ComposeUrlFunction.Arn
-      SecretArn: !Ref DbSecret
-      UrlSecretArn: !Ref DatabaseUrlSecret
-      Host: !GetAtt DbInstance.Endpoint.Address
-      Port: '5432'
-      DbName: !Ref DbName
-
-  ComposeUrlRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal: { Service: lambda.amazonaws.com }
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: secrets
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - secretsmanager:GetSecretValue
-                  - secretsmanager:PutSecretValue
-                Resource:
-                  - !Ref DbSecret
-                  - !Ref DatabaseUrlSecret
-
-  ComposeUrlFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      Runtime: python3.12
-      Handler: index.handler
-      Role: !GetAtt ComposeUrlRole.Arn
-      Timeout: 30
-      Code:
-        ZipFile: |
-          import json, boto3, cfnresponse, urllib.parse
-          sm = boto3.client('secretsmanager')
-          def handler(event, context):
-            try:
-              if event['RequestType'] == 'Delete':
-                cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-                return
-              p = event['ResourceProperties']
-              sec = json.loads(sm.get_secret_value(SecretId=p['SecretArn'])['SecretString'])
-              user = urllib.parse.quote(sec['username'])
-              pwd = urllib.parse.quote(sec['password'])
-              dsn = f"postgres://{user}:{pwd}@{p['Host']}:{p['Port']}/{p['DbName']}?sslmode=require"
-              sm.put_secret_value(SecretId=p['UrlSecretArn'], SecretString=json.dumps({
-                'dsn': dsn, 'host': p['Host'], 'port': p['Port'], 'dbname': p['DbName'],
-                'username': sec['username']
-              }))
-              cfnresponse.send(event, context, cfnresponse.SUCCESS, {'DsnReady': 'true'})
-            except Exception as e:
-              cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
-
 
 Outputs:
   DbEndpoint:

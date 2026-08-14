@@ -26,7 +26,7 @@ WHERE email IN ('sarah@example.com', 'david.brown@example.com', 'aisha.candidate
 -- More candidates for filter richness
 INSERT INTO candidates (name, title, skills, location, zip, billing_rate, vertical, education, programs, rating, experience, bio, email, availability, open_to_relocate, phone)
 SELECT * FROM (VALUES
-  ('Priya Sharma', 'Cloud Solutions Architect', ARRAY['AWS','Azure','Terraform','Kubernetes']::text[], 'Dallas, TX', '75201', 110, 'Information Technology', 'MS Cloud Computing', ARRAY['WOTC']::text[], 4.8, '10 years',
+  ('Bethlehem Worku', 'Cloud Solutions Architect', ARRAY['AWS','Azure','Terraform','Kubernetes']::text[], 'Dallas, TX', '75201', 110, 'Information Technology', 'MS Cloud Computing', ARRAY['WOTC']::text[], 4.8, '10 years',
    'Designs multi-cloud platforms for mid-market employers. AWS SA Pro + Azure Architect.', 'priya.sharma@example.com', 'open', true, '+1 555-0201'),
   ('Luis Ortega', 'Registered Nurse', ARRAY['Med-Surg','Patient Care','EMR','BLS']::text[], 'Phoenix, AZ', '85001', 65, 'Health & Healthcare', 'BSN Nursing', ARRAY['Refugee Employment']::text[], 4.7, '6 years',
    'Bedside RN seeking clinic or home-health GIG placements. Bilingual EN/ES.', 'luis.ortega@example.com', 'open', false, '+1 555-0202'),
