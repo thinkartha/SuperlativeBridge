@@ -416,6 +416,9 @@ Resources:
         List:
           Type: Api
           Properties: { RestApiId: !Ref Api, Path: /api/community, Method: GET }
+        Rsvp:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/community/events/{id}/rsvp, Method: POST }
 
   EntrepreneurshipFunction:
     Type: AWS::Serverless::Function

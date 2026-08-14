@@ -23,7 +23,7 @@ env:
   INFRA_STACK_NAME: superlativebridge-infra-${{ github.event.inputs.environment || vars.ENVIRONMENT || 'prod' }}
   SAM_STACK_NAME: superlativebridge-api-${{ github.event.inputs.environment || vars.ENVIRONMENT || 'prod' }}
   GO_VERSION: '1.24.x'
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
 
 permissions:
   contents: read

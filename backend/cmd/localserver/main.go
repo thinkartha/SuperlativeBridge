@@ -115,6 +115,7 @@ var routes = []route{
 	{"GET", "/api/visa-programs", visa.Handler},
 	{"GET", "/api/marketplace", marketplace.Handler},
 	{"GET", "/api/community", community.Handler},
+	{"POST", "/api/community/events/{id}/rsvp", community.Handler},
 	{"GET", "/api/entrepreneurship", entrepreneurship.Handler},
 	{"GET", "/api/candidates", candidates.Handler},
 	{"GET", "/api/candidates/{id}", candidates.Handler},

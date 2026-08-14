@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCommunity } from "@/hooks/api";
+import { useCommunity, useRsvpEvent } from "@/hooks/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { getIcon } from "@/lib/icons";
 import {
   Users,
@@ -12,58 +14,63 @@ import {
   ArrowRight,
   Search,
   MessageSquare,
+  Check,
+  Loader2,
 } from "lucide-react";
-
-interface CommunityPost {
-  id: string;
-  title?: string;
-  description?: string;
-  category?: string;
-  icon?: string;
-  items?: number;
-}
-
-interface CommunityEvent {
-  id: string;
-  title?: string;
-  date?: string;
-  type?: string;
-  attendees?: number;
-}
-
-interface CommunityGroup {
-  id: string;
-  name?: string;
-  role?: string;
-  expertise?: string;
-  avatar?: string;
-}
+import type { CommunityEvent, CommunityGroup, CommunityPost } from "@/types/api";
 
 const CommunityHub = () => {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
-
+  const [rsvped, setRsvped] = useState<Record<string, boolean>>({});
+  const { isAuthenticated } = useAuth();
   const { data, isLoading, isError, refetch } = useCommunity();
+  const rsvp = useRsvpEvent();
 
   const posts = (data?.posts ?? []) as CommunityPost[];
   const events = (data?.events ?? []) as CommunityEvent[];
   const groups = (data?.groups ?? []) as CommunityGroup[];
 
+  const resourcePosts = useMemo(
+    () =>
+      posts.map((p) => ({
+        ...p,
+        description: p.description ?? p.body ?? "",
+        items: p.items ?? p.likes ?? 0,
+      })),
+    [posts],
+  );
+
   const categories = [
     "all",
-    ...Array.from(new Set(posts.map((r) => r.category).filter(Boolean))),
+    ...Array.from(
+      new Set(resourcePosts.map((r) => r.category).filter(Boolean)),
+    ),
   ] as string[];
-  const filtered = posts.filter(
+  const filtered = resourcePosts.filter(
     (r) =>
       (activeCategory === "all" || r.category === activeCategory) &&
       ((r.title ?? "").toLowerCase().includes(search.toLowerCase()) ||
         (r.description ?? "").toLowerCase().includes(search.toLowerCase())),
   );
 
+  const handleRsvp = (event: CommunityEvent) => {
+    if (!event.id) return;
+    if (!isAuthenticated) {
+      toast.error("Sign in to RSVP for community events");
+      return;
+    }
+    if (rsvped[event.id]) return;
+    rsvp.mutate(event.id, {
+      onSuccess: () => {
+        setRsvped((prev) => ({ ...prev, [event.id]: true }));
+      },
+    });
+  };
+
   return (
-    <div className="space-y-8">
-      {/* Hero */}
-      <div className="bg-gradient-to-br from-accent/10 via-primary/5 to-background rounded-xl p-8 md:p-12">
+    <div className="w-full space-y-8">
+      <div className="bg-gradient-to-br from-accent/10 via-primary/5 to-background border border-border p-8 md:p-12">
         <Badge className="mb-4 bg-accent/10 text-accent border-accent/20">
           Community
         </Badge>
@@ -85,7 +92,6 @@ const CommunityHub = () => {
         </div>
       </div>
 
-      {/* Membership Benefits */}
       <div className="grid sm:grid-cols-3 gap-4">
         {[
           {
@@ -106,7 +112,7 @@ const CommunityHub = () => {
         ].map((item) => (
           <div
             key={item.title}
-            className="bg-card rounded-xl border border-border p-6"
+            className="bg-card border border-border p-6"
           >
             <item.icon className="w-8 h-8 text-primary mb-4" />
             <h3 className="font-heading font-semibold text-foreground mb-2">
@@ -120,13 +126,13 @@ const CommunityHub = () => {
       {isLoading && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 w-full rounded-xl" />
+            <Skeleton key={i} className="h-40 w-full" />
           ))}
         </div>
       )}
 
       {isError && !isLoading && (
-        <div className="bg-card rounded-xl border border-border py-16 text-center">
+        <div className="bg-card border border-border py-16 text-center">
           <p className="text-muted-foreground mb-4">
             Unable to load community content right now.
           </p>
@@ -138,7 +144,6 @@ const CommunityHub = () => {
 
       {!isLoading && !isError && (
         <>
-          {/* Resources */}
           <div>
             <h2 className="text-xl font-heading font-bold text-foreground mb-4">
               Resources
@@ -173,10 +178,10 @@ const CommunityHub = () => {
                 return (
                   <div
                     key={resource.id}
-                    className="bg-card rounded-xl border border-border p-6 hover:border-primary/30 transition-colors group cursor-pointer"
+                    className="bg-card border border-border p-6 hover:border-primary/30 transition-colors group cursor-pointer"
                   >
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                      <div className="w-10 h-10 bg-primary/10 flex items-center justify-center">
                         <Icon className="w-5 h-5 text-primary" />
                       </div>
                       {resource.category && (
@@ -188,7 +193,7 @@ const CommunityHub = () => {
                     <h3 className="font-heading font-semibold text-foreground mb-2">
                       {resource.title}
                     </h3>
-                    <p className="text-sm text-muted-foreground mb-4">
+                    <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
                       {resource.description}
                     </p>
                     <div className="flex items-center justify-between">
@@ -210,47 +215,61 @@ const CommunityHub = () => {
             )}
           </div>
 
-          {/* Events */}
           <div>
             <h2 className="text-xl font-heading font-bold text-foreground mb-4">
               Upcoming Events
             </h2>
             <div className="grid sm:grid-cols-2 gap-4">
-              {events.map((event) => (
-                <div
-                  key={event.id}
-                  className="bg-card rounded-xl border border-border p-6 flex items-start gap-4"
-                >
-                  <div className="bg-primary/10 rounded-lg p-3 text-center min-w-[60px]">
-                    <div className="text-lg font-heading font-bold text-primary">
-                      {event.date ? new Date(event.date).getDate() : "-"}
+              {events.map((event) => {
+                const done = !!rsvped[event.id];
+                const pending = rsvp.isPending && rsvp.variables === event.id;
+                return (
+                  <div
+                    key={event.id}
+                    className="bg-card border border-border p-6 flex items-start gap-4"
+                  >
+                    <div className="bg-primary/10 p-3 text-center min-w-[60px]">
+                      <div className="text-lg font-heading font-bold text-primary">
+                        {event.date ? new Date(event.date).getDate() : "-"}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {event.date
+                          ? new Date(event.date).toLocaleString("default", {
+                              month: "short",
+                            })
+                          : ""}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {event.date
-                        ? new Date(event.date).toLocaleString("default", {
-                            month: "short",
-                          })
-                        : ""}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-heading font-semibold text-foreground mb-1">
+                        {event.title}
+                      </h3>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                        {event.type && (
+                          <Badge variant="secondary" className="text-xs">
+                            {event.type}
+                          </Badge>
+                        )}
+                        <span>{event.attendees ?? 0} registered</span>
+                      </div>
                     </div>
+                    <Button
+                      size="sm"
+                      variant={done ? "secondary" : "outline"}
+                      disabled={done || pending}
+                      className="gap-1 shrink-0"
+                      onClick={() => handleRsvp(event)}
+                    >
+                      {pending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : done ? (
+                        <Check className="w-3.5 h-3.5" />
+                      ) : null}
+                      {done ? "Registered" : "RSVP"}
+                    </Button>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-heading font-semibold text-foreground mb-1">
-                      {event.title}
-                    </h3>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      {event.type && (
-                        <Badge variant="secondary" className="text-xs">
-                          {event.type}
-                        </Badge>
-                      )}
-                      <span>{event.attendees ?? 0} registered</span>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="outline">
-                    RSVP
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
             {events.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
@@ -259,7 +278,6 @@ const CommunityHub = () => {
             )}
           </div>
 
-          {/* Community Leaders */}
           <div>
             <h2 className="text-xl font-heading font-bold text-foreground mb-4">
               Community Leaders
@@ -268,9 +286,9 @@ const CommunityHub = () => {
               {groups.map((leader) => (
                 <div
                   key={leader.id}
-                  className="bg-card rounded-xl border border-border p-6 text-center"
+                  className="bg-card border border-border p-6 text-center"
                 >
-                  <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <div className="w-14 h-14 bg-primary/10 flex items-center justify-center mx-auto mb-3">
                     <span className="text-lg font-heading font-bold text-primary">
                       {leader.avatar ?? leader.name?.slice(0, 2).toUpperCase()}
                     </span>
@@ -279,10 +297,13 @@ const CommunityHub = () => {
                     {leader.name}
                   </h3>
                   <p className="text-xs text-primary font-medium">
-                    {leader.role}
+                    {leader.role ?? leader.category}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {leader.expertise}
+                    {leader.expertise ??
+                      (leader.members != null
+                        ? `${leader.members} members`
+                        : "")}
                   </p>
                 </div>
               ))}

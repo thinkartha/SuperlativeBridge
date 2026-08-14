@@ -2,15 +2,28 @@ package community
 
 import (
 	"context"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/jackc/pgx/v5"
 
+	"github.com/superlativebridge/backend/internal/auth"
 	"github.com/superlativebridge/backend/internal/db"
 	"github.com/superlativebridge/backend/internal/models"
 	"github.com/superlativebridge/backend/internal/response"
 )
 
 func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	if req.HTTPMethod == "POST" && strings.Contains(req.Resource, "/rsvp") {
+		return rsvpEvent(ctx, req)
+	}
+	if req.HTTPMethod == "GET" {
+		return listCommunity(ctx)
+	}
+	return response.Error(405, "method not allowed"), nil
+}
+
+func listCommunity(ctx context.Context) (events.APIGatewayProxyResponse, error) {
 	pool, err := db.Pool(ctx)
 	if err != nil {
 		return response.Error(500, err.Error()), nil
@@ -65,5 +78,36 @@ func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		"posts":  posts,
 		"events": events_,
 		"groups": groups,
+	}), nil
+}
+
+func rsvpEvent(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	if _, err := auth.FromRequest(req.Headers); err != nil {
+		return response.Error(401, "unauthorized"), nil
+	}
+	id := req.PathParameters["id"]
+	if id == "" {
+		return response.Error(400, "missing event id"), nil
+	}
+	pool, err := db.Pool(ctx)
+	if err != nil {
+		return response.Error(500, err.Error()), nil
+	}
+	var e models.CommunityEvent
+	err = pool.QueryRow(ctx, `
+		UPDATE community_events
+		SET attendees = attendees + 1
+		WHERE id = $1
+		RETURNING id, title, event_date, type, attendees`, id).
+		Scan(&e.ID, &e.Title, &e.EventDate, &e.Type, &e.Attendees)
+	if err == pgx.ErrNoRows {
+		return response.Error(404, "event not found"), nil
+	}
+	if err != nil {
+		return response.Error(500, err.Error()), nil
+	}
+	return response.JSON(200, map[string]interface{}{
+		"event":   e,
+		"message": "RSVP confirmed",
 	}), nil
 }

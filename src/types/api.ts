@@ -202,10 +202,43 @@ export interface StudentDashboard {
   activity: unknown[];
 }
 
+export interface CommunityPost {
+  id: string;
+  authorId?: string;
+  author?: string;
+  title?: string;
+  body?: string;
+  description?: string;
+  category?: string;
+  likes?: number;
+  icon?: string;
+  items?: number;
+  createdAt?: string;
+}
+
+export interface CommunityEvent {
+  id: string;
+  title?: string;
+  date?: string;
+  type?: string;
+  attendees?: number;
+}
+
+export interface CommunityGroup {
+  id: string;
+  name?: string;
+  category?: string;
+  members?: number;
+  icon?: string;
+  role?: string;
+  expertise?: string;
+  avatar?: string;
+}
+
 export interface CommunityData {
-  posts: unknown[];
-  events: unknown[];
-  groups: unknown[];
+  posts: CommunityPost[];
+  events: CommunityEvent[];
+  groups: CommunityGroup[];
 }
 
 export interface EntrepreneurshipData {

@@ -105,7 +105,7 @@ const MentorForm = () => {
 
   if (isEdit && isLoadingMentor) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -113,7 +113,7 @@ const MentorForm = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="w-full space-y-8">
       <div>
         <Button
           variant="ghost"
@@ -132,25 +132,23 @@ const MentorForm = () => {
         </p>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 overflow-x-auto">
         {steps.map((s, i) => (
-          <div key={i} className="flex items-center gap-2 flex-1">
+          <div key={i} className="flex items-center gap-2 flex-1 min-w-[140px]">
             <div
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl border flex-1 transition-all ${
+              className={`flex items-center gap-3 px-4 py-3 border flex-1 transition-all ${
                 i === step
                   ? "bg-primary/10 border-primary/30"
                   : i < step
-                    ? "bg-green-50 border-green-200"
+                    ? "bg-primary/5 border-primary/20"
                     : "bg-card border-border"
               }`}
             >
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                  i < step
-                    ? "bg-green-500 text-white"
-                    : i === step
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
+                className={`w-8 h-8 flex items-center justify-center text-xs font-bold shrink-0 ${
+                  i <= step
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
                 {i < step ? <Check className="w-4 h-4" /> : i + 1}
@@ -166,9 +164,9 @@ const MentorForm = () => {
         ))}
       </div>
 
-      <div className="bg-card rounded-xl border border-border p-8 min-h-[320px]">
+      <div className="bg-card border border-border p-6 lg:p-8 min-h-[320px]">
         {step === 0 && (
-          <div className="space-y-6">
+          <div className="space-y-6 max-w-3xl">
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Full Name *</Label>
               <Input
@@ -191,7 +189,7 @@ const MentorForm = () => {
           </div>
         )}
         {step === 1 && (
-          <div className="space-y-6">
+          <div className="space-y-6 max-w-3xl">
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Vertical *</Label>
               <Select
@@ -241,7 +239,7 @@ const MentorForm = () => {
         )}
         {step === 2 && (
           <div className="space-y-6">
-            <div className="space-y-2">
+            <div className="space-y-2 max-w-3xl">
               <Label className="text-sm font-semibold">Bio</Label>
               <Textarea
                 placeholder="Brief background and teaching philosophy..."
@@ -253,7 +251,7 @@ const MentorForm = () => {
             <h3 className="text-lg font-heading font-bold text-foreground mt-6">
               Review
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
                 ["Name", form.name || "—"],
                 ["Email", form.email || "—"],
@@ -261,7 +259,7 @@ const MentorForm = () => {
                 ["Expertise", form.expertise || "—"],
                 ["Status", form.status],
               ].map(([label, value]) => (
-                <div key={label}>
+                <div key={label} className="border border-border bg-muted/20 p-4">
                   <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">
                     {label}
                   </p>
