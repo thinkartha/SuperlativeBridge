@@ -55,6 +55,107 @@ PARAMS=(
   "CognitoLogoutURLs=${LOGOUT_URLS}"
 )
 
+# --- Unstick ROLLBACK_FAILED / DELETE_FAILED (cannot CreateChangeSet otherwise) ---
+# retain-resources is ONLY valid when status is DELETE_FAILED. For ROLLBACK_FAILED,
+# delete once without retain (→ DELETE_FAILED), then delete again with retain.
+clear_failed_stack() {
+  local status
+  status=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$AWS_REGION" \
+    --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+
+  force_delete_nested() {
+    local nested nstatus
+    nested=$(aws cloudformation describe-stack-resources --stack-name "$STACK_NAME" --region "$AWS_REGION" \
+      --logical-resource-id DatabaseStack \
+      --query 'StackResources[0].PhysicalResourceId' --output text 2>/dev/null || true)
+    [[ -z "${nested:-}" || "$nested" == "None" ]] && return 0
+    nstatus=$(aws cloudformation describe-stacks --stack-name "$nested" --region "$AWS_REGION" \
+      --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+    [[ "$nstatus" == "NOT_FOUND" ]] && return 0
+    echo "Clearing nested DatabaseStack (${nstatus})…"
+    if [[ "$nstatus" == "DELETE_FAILED" ]]; then
+      aws cloudformation delete-stack --stack-name "$nested" --region "$AWS_REGION" \
+        --retain-resources ComposeDatabaseUrl ComposeUrlFunction ComposeUrlRole \
+          DatabaseUrlSecret DbInstance DbSecret RdsSecurityGroup DbSubnetGroup 2>/dev/null \
+        || aws cloudformation delete-stack --stack-name "$nested" --region "$AWS_REGION" \
+          --retain-resources ComposeDatabaseUrl || true
+    else
+      # Nested may be ROLLBACK_FAILED / CREATE_COMPLETE / etc. — delete without retain first
+      aws cloudformation delete-stack --stack-name "$nested" --region "$AWS_REGION" || true
+      sleep 5
+      nstatus=$(aws cloudformation describe-stacks --stack-name "$nested" --region "$AWS_REGION" \
+        --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+      if [[ "$nstatus" == "DELETE_FAILED" ]]; then
+        aws cloudformation delete-stack --stack-name "$nested" --region "$AWS_REGION" \
+          --retain-resources ComposeDatabaseUrl ComposeUrlFunction ComposeUrlRole \
+            DatabaseUrlSecret DbInstance DbSecret RdsSecurityGroup DbSubnetGroup 2>/dev/null \
+          || aws cloudformation delete-stack --stack-name "$nested" --region "$AWS_REGION" \
+            --retain-resources ComposeDatabaseUrl || true
+      fi
+    fi
+    aws cloudformation wait stack-delete-complete --stack-name "$nested" --region "$AWS_REGION" 2>/dev/null || true
+  }
+
+  case "$status" in
+    ROLLBACK_FAILED|UPDATE_ROLLBACK_FAILED)
+      echo "WARNING: ${STACK_NAME} is ${status} — two-step force delete required…"
+      force_delete_nested
+      # Pass 1: no retain (moves ROLLBACK_FAILED → DELETE_FAILED when DatabaseStack blocks)
+      echo "Delete pass 1 (no retain)…"
+      aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$AWS_REGION" || true
+      # Poll until DELETE_FAILED or gone
+      for _ in $(seq 1 60); do
+        status=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$AWS_REGION" \
+          --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+        echo "  status=${status}"
+        case "$status" in
+          NOT_FOUND) break ;;
+          DELETE_FAILED) break ;;
+          DELETE_IN_PROGRESS) sleep 10 ;;
+          *) sleep 5 ;;
+        esac
+      done
+      if [[ "$status" == "DELETE_FAILED" ]]; then
+        echo "Delete pass 2 (retain DatabaseStack)…"
+        aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$AWS_REGION" \
+          --retain-resources DatabaseStack
+        aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$AWS_REGION"
+      elif [[ "$status" != "NOT_FOUND" ]]; then
+        echo "ERROR: expected DELETE_FAILED or gone, got ${status}"
+        exit 1
+      fi
+      echo "Failed stack removed. Continuing with a fresh create…"
+      for sec in "superlativebridge/${ENVIRONMENT}/rds" "superlativebridge/${ENVIRONMENT}/database-url"; do
+        aws secretsmanager delete-secret --secret-id "$sec" --region "$AWS_REGION" \
+          --force-delete-without-recovery 2>/dev/null || true
+      done
+      ;;
+    DELETE_FAILED)
+      echo "WARNING: ${STACK_NAME} is DELETE_FAILED — deleting with retain…"
+      force_delete_nested
+      aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$AWS_REGION" \
+        --retain-resources DatabaseStack NetworkStack CognitoStack FrontendStack 2>/dev/null \
+        || aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$AWS_REGION" \
+          --retain-resources DatabaseStack
+      aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$AWS_REGION"
+      for sec in "superlativebridge/${ENVIRONMENT}/rds" "superlativebridge/${ENVIRONMENT}/database-url"; do
+        aws secretsmanager delete-secret --secret-id "$sec" --region "$AWS_REGION" \
+          --force-delete-without-recovery 2>/dev/null || true
+      done
+      ;;
+    *_IN_PROGRESS)
+      echo "ERROR: ${STACK_NAME} is ${status}. Wait for it to finish, then re-run."
+      exit 1
+      ;;
+    NOT_FOUND|CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE|ROLLBACK_COMPLETE)
+      ;;
+    *)
+      echo "Stack status: ${status}"
+      ;;
+  esac
+}
+clear_failed_stack
+
 echo "Deploying ${STACK_NAME} (domain=${DOMAIN_NAME:-none} zone=${HOSTED_ZONE_ID} region=${AWS_REGION})"
 aws cloudformation deploy \
   --region "$AWS_REGION" \
