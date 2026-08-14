@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 7%;
+
+    --card: 250 15% 96%;
+    --card-foreground: 0 0% 7%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 7%;
+
+    --primary: 270 70% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 250 12% 95%;
+    --secondary-foreground: 0 0% 7%;
+
+    --muted: 250 8% 94%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 180 65% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 250 8% 90%;
+    --input: 250 8% 90%;
+    --ring: 270 70% 55%;
+
+    --radius: 0rem;
+
+    --sidebar-background: 250 12% 97%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 270 70% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 250 10% 94%;
+    --sidebar-accent-foreground: 0 0% 20%;
+    --sidebar-border: 250 8% 90%;
+    --sidebar-ring: 270 70% 55%;
+
+    --surface-warm: 250 12% 96%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Reduced-motion mode: pause decorative animations (orbs, drifts, pulses) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  [data-motion="orbs"] > * {
+    animation: none !important;
+    transform: none !important;
+  }
+}

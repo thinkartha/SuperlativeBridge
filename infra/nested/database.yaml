@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SuperlativeBridge RDS Postgres (private) + Secrets Manager
+
+Parameters:
+  Environment:
+    Type: String
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  PrivateSubnetIds:
+    Type: CommaDelimitedList
+  LambdaSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  DbInstanceClass:
+    Type: String
+  DbAllocatedStorage:
+    Type: Number
+  DbMasterUsername:
+    Type: String
+  DbName:
+    Type: String
+
+Resources:
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub superlativebridge/${Environment}/rds
+      Description: RDS master credentials
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username":"${DbMasterUsername}"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludeCharacters: '"@/\'
+        RequireEachIncludedType: true
+
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SuperlativeBridge RDS Postgres
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref LambdaSecurityGroupId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub sb-${Environment}-rds-sg
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: SuperlativeBridge private subnets
+      SubnetIds: !Ref PrivateSubnetIds
+      Tags:
+        - Key: Name
+          Value: !Sub sb-${Environment}-db-subnets
+
+  DbInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub sb-${Environment}-postgres
+      Engine: postgres
+      EngineVersion: '16.4'
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: !Ref DbAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      MultiAZ: false
+      PubliclyAccessible: false
+      VPCSecurityGroups:
+        - !Ref RdsSecurityGroup
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      DBName: !Ref DbName
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:password}}'
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: '07:00-08:00'
+      PreferredMaintenanceWindow: 'sun:08:00-sun:09:00'
+      DeletionProtection: false
+      EnableCloudwatchLogsExports:
+        - postgresql
+      Tags:
+        - Key: Name
+          Value: !Sub sb-${Environment}-rds
+
+  DatabaseUrlSecret:
+    Type: AWS::SecretsManager::Secret
+    DependsOn: DbInstance
+    Properties:
+      Name: !Sub superlativebridge/${Environment}/database-url
+      Description: >
+        Full Postgres DSN. Populated by deploy pipeline after RDS is ready
+        (compose from DbSecret + endpoint). Seed value uses host placeholder.
+      SecretString: !Sub
+        - '{"dsn":"postgres://PLACEHOLDER@${Host}:5432/${Db}?sslmode=require","host":"${Host}","port":"5432","dbname":"${Db}"}'
+        - Host: !GetAtt DbInstance.Endpoint.Address
+          Db: !Ref DbName
+
+  ComposeDatabaseUrl:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: [DbInstance, DbSecret]
+    Properties:
+      ServiceToken: !GetAtt ComposeUrlFunction.Arn
+      SecretArn: !Ref DbSecret
+      UrlSecretArn: !Ref DatabaseUrlSecret
+      Host: !GetAtt DbInstance.Endpoint.Address
+      Port: '5432'
+      DbName: !Ref DbName
+
+  ComposeUrlRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: secrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                Resource:
+                  - !Ref DbSecret
+                  - !Ref DatabaseUrlSecret
+
+  ComposeUrlFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt ComposeUrlRole.Arn
+      Timeout: 30
+      Code:
+        ZipFile: |
+          import json, boto3, cfnresponse, urllib.parse
+          sm = boto3.client('secretsmanager')
+          def handler(event, context):
+            try:
+              if event['RequestType'] == 'Delete':
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                return
+              p = event['ResourceProperties']
+              sec = json.loads(sm.get_secret_value(SecretId=p['SecretArn'])['SecretString'])
+              user = urllib.parse.quote(sec['username'])
+              pwd = urllib.parse.quote(sec['password'])
+              dsn = f"postgres://{user}:{pwd}@{p['Host']}:{p['Port']}/{p['DbName']}?sslmode=require"
+              sm.put_secret_value(SecretId=p['UrlSecretArn'], SecretString=json.dumps({
+                'dsn': dsn, 'host': p['Host'], 'port': p['Port'], 'dbname': p['DbName'],
+                'username': sec['username']
+              }))
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, {'DsnReady': 'true'})
+            except Exception as e:
+              cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+
+Outputs:
+  DbEndpoint:
+    Value: !GetAtt DbInstance.Endpoint.Address
+  DbPort:
+    Value: !GetAtt DbInstance.Endpoint.Port
+  DbSecretArn:
+    Value: !Ref DbSecret
+  DatabaseUrlSecretArn:
+    Value: !Ref DatabaseUrlSecret
+  RdsSecurityGroupId:
+    Value: !Ref RdsSecurityGroup
+  DbInstanceId:
+    Value: !Ref DbInstance

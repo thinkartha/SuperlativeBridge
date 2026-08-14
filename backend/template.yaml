@@ -1,0 +1,551 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SuperlativeBridge Backend API — Go Lambdas, Cognito authorizer, VPC to RDS
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Optional direct DSN. Prefer DatabaseUrlSecretArn in AWS.
+  DatabaseUrlSecretArn:
+    Type: String
+    Default: ''
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    Description: Fallback HS256 secret for local / dual-auth mode.
+  CognitoUserPoolArn:
+    Type: String
+    Default: ''
+  CognitoUserPoolId:
+    Type: String
+    Default: ''
+  CognitoUserPoolClientId:
+    Type: String
+    Default: ''
+  VpcSubnetIds:
+    Type: CommaDelimitedList
+    Default: ''
+  LambdaSecurityGroupId:
+    Type: String
+    Default: ''
+  LmsApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+  IntegrationWebhookSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+  CorsAllowOrigin:
+    Type: String
+    Default: "'*'"
+
+Conditions:
+  UseVpc: !Not [!Equals [!Join ['', !Ref VpcSubnetIds], '']]
+  UseCognito: !Not [!Equals [!Ref CognitoUserPoolArn, '']]
+  UseSecretArn: !Not [!Equals [!Ref DatabaseUrlSecretArn, '']]
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: provided.al2023
+    Architectures: [arm64]
+    Environment:
+      Variables:
+        DATABASE_URL: !Ref DatabaseUrl
+        DATABASE_URL_SECRET_ARN: !Ref DatabaseUrlSecretArn
+        JWT_SECRET: !Ref JwtSecret
+        COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
+        COGNITO_CLIENT_ID: !Ref CognitoUserPoolClientId
+        LMS_API_KEY: !Ref LmsApiKey
+        INTEGRATION_WEBHOOK_SECRET: !Ref IntegrationWebhookSecret
+        ENVIRONMENT: !Ref Environment
+    VpcConfig: !If
+      - UseVpc
+      - SubnetIds: !Ref VpcSubnetIds
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroupId
+      - !Ref AWS::NoValue
+    Policies: !If
+      - UseSecretArn
+      - - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Ref DatabaseUrlSecretArn
+      - !Ref AWS::NoValue
+
+Resources:
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      TracingEnabled: true
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          LoggingLevel: INFO
+          DataTraceEnabled: false
+          MetricsEnabled: true
+      Cors:
+        AllowOrigin: !Ref CorsAllowOrigin
+        AllowHeaders: "'Content-Type,Authorization,X-Api-Key,X-SB-Signature,X-SB-Timestamp,X-Request-Id'"
+        AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+      Auth: !If
+        - UseCognito
+        - DefaultAuthorizer: CognitoAuthorizer
+          AddDefaultAuthorizerToCorsPreflight: false
+          Authorizers:
+            CognitoAuthorizer:
+              UserPoolArn: !Ref CognitoUserPoolArn
+        - !Ref AWS::NoValue
+
+  HealthFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/health/
+      Handler: bootstrap
+      Events:
+        Get:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/health
+            Method: GET
+            Auth:
+              Authorizer: NONE
+
+  CoursesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/courses/
+      Handler: bootstrap
+      Events:
+        List:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/courses, Method: GET }
+        Get:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/courses/{id}, Method: GET }
+        Create:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/courses, Method: POST }
+        Update:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/courses/{id}, Method: PUT }
+        Delete:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/courses/{id}, Method: DELETE }
+
+  CategoriesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/categories/
+      Handler: bootstrap
+      Events:
+        List:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/categories, Method: GET }
+        Create:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/categories, Method: POST }
+        Update:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/categories/{id}, Method: PUT }
+        Delete:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/categories/{id}, Method: DELETE }
+
+  MentorsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/mentors/
+      Handler: bootstrap
+      Events:
+        List:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/mentors, Method: GET }
+        Get:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}, Method: GET }
+        Analytics:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}/analytics, Method: GET }
+        Create:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/mentors, Method: POST }
+        Update:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}, Method: PUT }
+        Delete:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}, Method: DELETE }
+
+  UsersFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/users/
+      Handler: bootstrap
+      Events:
+        List:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users, Method: GET }
+        Get:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}, Method: GET }
+        Create:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users, Method: POST }
+        Update:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}, Method: PUT }
+        Delete:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}, Method: DELETE }
+        Enrollments:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/enrollments, Method: GET }
+        Certifications:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/certifications, Method: GET }
+        Notifications:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/notifications, Method: GET }
+        Dashboard:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/dashboard, Method: GET }
+        SavedCourses:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/saved-courses, Method: GET }
+        MentorBookings:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/mentor-bookings, Method: GET }
+        Analytics:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/analytics, Method: GET }
+
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/auth/
+      Handler: bootstrap
+      Events:
+        SignIn:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/auth/signin
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        SignUp:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/auth/signup
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        CognitoConfig:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/auth/cognito-config
+            Method: GET
+            Auth:
+              Authorizer: NONE
+
+  ProgramsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/programs/
+      Handler: bootstrap
+      Events:
+        List:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/programs, Method: GET }
+        Get:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/programs/{id}, Method: GET }
+
+  VisaFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/visa/
+      Handler: bootstrap
+      Events:
+        List:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/visa-programs, Method: GET }
+
+  EnrollmentsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/enrollments/
+      Handler: bootstrap
+      Events:
+        Create:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/enrollments, Method: POST }
+        Update:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/enrollments/{id}, Method: PATCH }
+        Delete:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/enrollments/{id}, Method: DELETE }
+        QuizAttempts:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/quiz-attempts, Method: POST }
+
+  IntegrationsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/integrations/
+      Handler: bootstrap
+      Events:
+        List:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/integrations, Method: GET }
+        Get:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/integrations/{id}, Method: GET }
+        Put:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/integrations/{id}, Method: PUT }
+        PutPipeline:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/integrations/pipelines/{id}, Method: PUT }
+        Run:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/integrations/pipelines/{id}/run, Method: POST }
+
+  SavedCoursesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/savedcourses/
+      Handler: bootstrap
+      Events:
+        Create:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/saved-courses, Method: POST }
+        Delete:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/saved-courses/{courseId}, Method: DELETE }
+
+  MentorBookingsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/mentorbookings/
+      Handler: bootstrap
+      Events:
+        Create:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/mentor-bookings, Method: POST }
+        Update:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/mentor-bookings/{id}, Method: PATCH }
+        Availability:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}/availability, Method: GET }
+        Bookings:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}/bookings, Method: GET }
+
+  EmployerAnalyticsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/employeranalytics/
+      Handler: bootstrap
+      Events:
+        Analytics:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/employer/analytics, Method: GET }
+        Export:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/employer/analytics/export, Method: GET }
+
+  MarketplaceFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/marketplace/
+      Handler: bootstrap
+      Events:
+        List:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/marketplace, Method: GET }
+
+  CommunityFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/community/
+      Handler: bootstrap
+      Events:
+        List:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/community, Method: GET }
+
+  EntrepreneurshipFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/entrepreneurship/
+      Handler: bootstrap
+      Events:
+        List:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/entrepreneurship, Method: GET }
+
+  CandidatesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/candidates/
+      Handler: bootstrap
+      Events:
+        List:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/candidates, Method: GET }
+        Get:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/candidates/{id}, Method: GET }
+
+  AdminFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/admin/
+      Handler: bootstrap
+      Events:
+        Stats:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/admin/stats, Method: GET }
+        AuditLog:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/admin/audit-log, Method: GET }
+        UserAnalytics:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/admin/user-analytics, Method: GET }
+        MentorAnalytics:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/admin/mentor-analytics, Method: GET }
+        Notifications:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/admin/notifications, Method: GET }
+        NotificationPatch:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/admin/notifications/{id}, Method: PATCH }
+
+  SettingsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/settings/
+      Handler: bootstrap
+      Events:
+        Get:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/settings, Method: GET }
+        Put:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/settings, Method: PUT }
+
+  LmsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/lms/
+      Handler: bootstrap
+      Events:
+        Providers:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/lms/providers
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        Import:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/lms/courses/import
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        Sync:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/lms/providers/{provider}/sync, Method: POST }
+        Webhook:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/lms/webhooks/{provider}
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        Jobs:
+          Type: Api
+          Properties: { RestApiId: !Ref Api, Path: /api/lms/jobs, Method: GET }
+
+  MigrateFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: cmd/migrate/
+      Handler: bootstrap
+      Timeout: 120
+      MemorySize: 512
+      Description: Applies embedded SQL migrations against RDS (invoke from CI)
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  ApiId:
+    Value: !Ref Api
+  CognitoUserPoolIdOut:
+    Value: !Ref CognitoUserPoolId
+  EnvironmentOut:
+    Value: !Ref Environment
+  MigrateFunctionName:
+    Description: Invoke after deploy to apply SQL migrations
+    Value: !Ref MigrateFunction

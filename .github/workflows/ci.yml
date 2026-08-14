@@ -1,0 +1,38 @@
+# CI / PR checks (no AWS deploy)
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache-dependency-path: backend/go.sum
+      - name: Sync migrate embeds
+        run: |
+          mkdir -p backend/cmd/migrate/migrations
+          cp backend/migrations/*.sql backend/cmd/migrate/migrations/
+      - working-directory: backend
+        run: |
+          go vet ./...
+          go build ./...
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_API_BASE_URL: http://localhost:8081

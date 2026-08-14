@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sb-db
+    environment:
+      POSTGRES_USER: sbuser
+      POSTGRES_PASSWORD: sbpassword
+      POSTGRES_DB: superlativebridge
+    ports:
+      - "5432:5432"
+      # 5433 avoids the local Homebrew/Postgres on 127.0.0.1:5432
+      - "5433:5432"
+    # 001_init.sql then 002_seed.sql run automatically on first start,
+    # so the database comes up pre-filled with seed data.
+    volumes:
+      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
+      - sb-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sbuser -d superlativebridge"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sb-api
+    environment:
+      DATABASE_URL: postgres://sbuser:sbpassword@db:5432/superlativebridge?sslmode=disable
+      JWT_SECRET: local-dev-jwt-secret-change-me
+      PORT: "8081"
+    ports:
+      - "8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/healthcheck", "http://localhost:8081/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: sb-web
+    environment:
+      VITE_API_BASE_URL: http://localhost:8081
+    ports:
+      - "8080:8080"
+    depends_on:
+      api:
+        condition: service_started
+    volumes:
+      - ./src:/app/src:ro
+      - ./index.html:/app/index.html:ro
+      - ./public:/app/public:ro
+
+volumes:
+  sb-db-data:

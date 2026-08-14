@@ -1,0 +1,271 @@
+name: Deploy SuperlativeBridge (AWS)
+
+# Infra (VPC/RDS/Cognito/S3/CloudFront/ACM) → API (Go Lambdas) → migrate → UI
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: prod
+        type: choice
+        options: [dev, staging, prod]
+      skip_infra:
+        description: Skip infra stack (API + UI only)
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  ENVIRONMENT: ${{ github.event.inputs.environment || vars.ENVIRONMENT || 'prod' }}
+  INFRA_STACK_NAME: superlativebridge-infra-${{ github.event.inputs.environment || vars.ENVIRONMENT || 'prod' }}
+  SAM_STACK_NAME: superlativebridge-api-${{ github.event.inputs.environment || vars.ENVIRONMENT || 'prod' }}
+  GO_VERSION: '1.24.x'
+  NODE_VERSION: '20'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+      - name: Go vet / build
+        working-directory: backend
+        run: |
+          go vet ./...
+          go build ./...
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_API_BASE_URL: https://example.invalid
+
+  deploy-infra:
+    needs: validate
+    if: ${{ github.event.inputs.skip_infra != 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      vpc_id: ${{ steps.outs.outputs.vpc_id }}
+      private_subnets: ${{ steps.outs.outputs.private_subnets }}
+      lambda_sg: ${{ steps.outs.outputs.lambda_sg }}
+      db_secret_arn: ${{ steps.outs.outputs.db_secret_arn }}
+      cognito_pool_id: ${{ steps.outs.outputs.cognito_pool_id }}
+      cognito_pool_arn: ${{ steps.outs.outputs.cognito_pool_arn }}
+      cognito_client_id: ${{ steps.outs.outputs.cognito_client_id }}
+      web_bucket: ${{ steps.outs.outputs.web_bucket }}
+      cf_dist_id: ${{ steps.outs.outputs.cf_dist_id }}
+      website_url: ${{ steps.outs.outputs.website_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy infrastructure (Cognito, RDS, CloudFront, ACM)
+        env:
+          DOMAIN_NAME: ${{ vars.DOMAIN_NAME || '' }}
+          HOSTED_ZONE_ID: ${{ vars.HOSTED_ZONE_ID || 'Z01669412PYXMU5Y52OPY' }}
+          CERTIFICATE_ARN: ${{ vars.CERTIFICATE_ARN || '' }}
+          CFN_ARTIFACT_BUCKET: ${{ secrets.CFN_ARTIFACT_BUCKET || '' }}
+        run: |
+          chmod +x scripts/deploy-infra.sh
+          ./scripts/deploy-infra.sh
+
+      - name: Export stack outputs
+        id: outs
+        run: |
+          q() { aws cloudformation describe-stacks --stack-name "$INFRA_STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+          echo "vpc_id=$(q VpcId)" >> "$GITHUB_OUTPUT"
+          echo "private_subnets=$(q PrivateSubnetIds)" >> "$GITHUB_OUTPUT"
+          echo "lambda_sg=$(q LambdaSecurityGroupId)" >> "$GITHUB_OUTPUT"
+          echo "db_secret_arn=$(q DatabaseUrlSecretArn)" >> "$GITHUB_OUTPUT"
+          echo "cognito_pool_id=$(q CognitoUserPoolId)" >> "$GITHUB_OUTPUT"
+          echo "cognito_pool_arn=$(q CognitoUserPoolArn)" >> "$GITHUB_OUTPUT"
+          echo "cognito_client_id=$(q CognitoUserPoolClientId)" >> "$GITHUB_OUTPUT"
+          echo "web_bucket=$(q WebBucketName)" >> "$GITHUB_OUTPUT"
+          echo "cf_dist_id=$(q CloudFrontDistributionId)" >> "$GITHUB_OUTPUT"
+          echo "website_url=$(q WebsiteUrl)" >> "$GITHUB_OUTPUT"
+
+  deploy-api:
+    needs: [validate, deploy-infra]
+    if: always() && needs.validate.result == 'success' && (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
+    runs-on: ubuntu-latest
+    outputs:
+      api_url: ${{ steps.deploy.outputs.api_url }}
+      migrate_fn: ${{ steps.deploy.outputs.migrate_fn }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+      - uses: aws-actions/setup-sam@v2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve infra outputs (if infra skipped)
+        id: infra
+        run: |
+          if [[ "${{ needs.deploy-infra.result }}" == "success" ]]; then
+            echo "private_subnets=${{ needs.deploy-infra.outputs.private_subnets }}" >> "$GITHUB_OUTPUT"
+            echo "lambda_sg=${{ needs.deploy-infra.outputs.lambda_sg }}" >> "$GITHUB_OUTPUT"
+            echo "db_secret_arn=${{ needs.deploy-infra.outputs.db_secret_arn }}" >> "$GITHUB_OUTPUT"
+            echo "cognito_pool_id=${{ needs.deploy-infra.outputs.cognito_pool_id }}" >> "$GITHUB_OUTPUT"
+            echo "cognito_pool_arn=${{ needs.deploy-infra.outputs.cognito_pool_arn }}" >> "$GITHUB_OUTPUT"
+            echo "cognito_client_id=${{ needs.deploy-infra.outputs.cognito_client_id }}" >> "$GITHUB_OUTPUT"
+            echo "website_url=${{ needs.deploy-infra.outputs.website_url }}" >> "$GITHUB_OUTPUT"
+          else
+            q() { aws cloudformation describe-stacks --stack-name "$INFRA_STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text 2>/dev/null || true; }
+            echo "private_subnets=$(q PrivateSubnetIds)" >> "$GITHUB_OUTPUT"
+            echo "lambda_sg=$(q LambdaSecurityGroupId)" >> "$GITHUB_OUTPUT"
+            echo "db_secret_arn=$(q DatabaseUrlSecretArn)" >> "$GITHUB_OUTPUT"
+            echo "cognito_pool_id=$(q CognitoUserPoolId)" >> "$GITHUB_OUTPUT"
+            echo "cognito_pool_arn=$(q CognitoUserPoolArn)" >> "$GITHUB_OUTPUT"
+            echo "cognito_client_id=$(q CognitoUserPoolClientId)" >> "$GITHUB_OUTPUT"
+            echo "website_url=$(q WebsiteUrl)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compose DATABASE_URL from Secrets Manager
+        id: dsn
+        run: |
+          ARN="${{ steps.infra.outputs.db_secret_arn }}"
+          if [[ -n "$ARN" && "$ARN" != "None" ]]; then
+            DSN=$(aws secretsmanager get-secret-value --secret-id "$ARN" --query SecretString --output text \
+              | python3 -c 'import sys,json; print(json.load(sys.stdin).get("dsn",""))')
+            echo "::add-mask::$DSN"
+            echo "database_url=$DSN" >> "$GITHUB_OUTPUT"
+          else
+            echo "database_url=${{ secrets.DATABASE_URL }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sync migrations into migrate Lambda
+        run: |
+          mkdir -p backend/cmd/migrate/migrations
+          cp backend/migrations/*.sql backend/cmd/migrate/migrations/
+
+      - name: SAM Build
+        working-directory: backend
+        run: sam build
+
+      - name: SAM Deploy (Go Lambdas + API Gateway)
+        id: deploy
+        working-directory: backend
+        run: |
+          CORS="'${{ steps.infra.outputs.website_url }}'"
+          [[ -z "${{ steps.infra.outputs.website_url }}" || "${{ steps.infra.outputs.website_url }}" == "None" ]] && CORS="'*'"
+          sam deploy \
+            --stack-name "$SAM_STACK_NAME" \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+            --resolve-s3 \
+            --parameter-overrides \
+              Environment="$ENVIRONMENT" \
+              DatabaseUrl="${{ steps.dsn.outputs.database_url }}" \
+              DatabaseUrlSecretArn="${{ steps.infra.outputs.db_secret_arn }}" \
+              JwtSecret="${{ secrets.JWT_SECRET }}" \
+              CognitoUserPoolArn="${{ steps.infra.outputs.cognito_pool_arn }}" \
+              CognitoUserPoolId="${{ steps.infra.outputs.cognito_pool_id }}" \
+              CognitoUserPoolClientId="${{ steps.infra.outputs.cognito_client_id }}" \
+              VpcSubnetIds="${{ steps.infra.outputs.private_subnets }}" \
+              LambdaSecurityGroupId="${{ steps.infra.outputs.lambda_sg }}" \
+              LmsApiKey="${{ secrets.LMS_API_KEY }}" \
+              IntegrationWebhookSecret="${{ secrets.INTEGRATION_WEBHOOK_SECRET }}" \
+              CorsAllowOrigin="$CORS"
+          API_URL=$(aws cloudformation describe-stacks --stack-name "$SAM_STACK_NAME" \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
+          MIGRATE_FN=$(aws cloudformation describe-stacks --stack-name "$SAM_STACK_NAME" \
+            --query "Stacks[0].Outputs[?OutputKey=='MigrateFunctionName'].OutputValue" --output text)
+          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "migrate_fn=$MIGRATE_FN" >> "$GITHUB_OUTPUT"
+
+      - name: Run DB migrations (VPC Lambda)
+        run: |
+          aws lambda invoke \
+            --function-name "${{ steps.deploy.outputs.migrate_fn }}" \
+            --payload '{"action":"migrate"}' \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/migrate-out.json
+          cat /tmp/migrate-out.json
+
+  deploy-frontend:
+    needs: [deploy-api, deploy-infra]
+    if: always() && needs.deploy-api.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve buckets / API
+        id: cfg
+        run: |
+          if [[ "${{ needs.deploy-infra.result }}" == "success" ]]; then
+            echo "bucket=${{ needs.deploy-infra.outputs.web_bucket }}" >> "$GITHUB_OUTPUT"
+            echo "dist=${{ needs.deploy-infra.outputs.cf_dist_id }}" >> "$GITHUB_OUTPUT"
+            echo "cognito_pool=${{ needs.deploy-infra.outputs.cognito_pool_id }}" >> "$GITHUB_OUTPUT"
+            echo "cognito_client=${{ needs.deploy-infra.outputs.cognito_client_id }}" >> "$GITHUB_OUTPUT"
+          else
+            q() { aws cloudformation describe-stacks --stack-name "$INFRA_STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+            echo "bucket=$(q WebBucketName)" >> "$GITHUB_OUTPUT"
+            echo "dist=$(q CloudFrontDistributionId)" >> "$GITHUB_OUTPUT"
+            echo "cognito_pool=$(q CognitoUserPoolId)" >> "$GITHUB_OUTPUT"
+            echo "cognito_client=$(q CognitoUserPoolClientId)" >> "$GITHUB_OUTPUT"
+          fi
+          echo "api_url=${{ needs.deploy-api.outputs.api_url }}" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+      - name: Build UI (Cognito auth mode)
+        env:
+          VITE_API_BASE_URL: ${{ steps.cfg.outputs.api_url }}
+          VITE_COGNITO_USER_POOL_ID: ${{ steps.cfg.outputs.cognito_pool }}
+          VITE_COGNITO_CLIENT_ID: ${{ steps.cfg.outputs.cognito_client }}
+          VITE_COGNITO_REGION: ${{ env.AWS_REGION }}
+          VITE_AUTH_MODE: cognito
+        run: npm run build
+
+      - name: Sync to S3 + invalidate CloudFront
+        run: |
+          aws s3 sync dist/ "s3://${{ steps.cfg.outputs.bucket }}" --delete \
+            --cache-control "public,max-age=31536000,immutable" --exclude "index.html" --exclude "openapi.json"
+          aws s3 cp dist/index.html "s3://${{ steps.cfg.outputs.bucket }}/index.html" --cache-control "no-cache"
+          aws s3 cp dist/openapi.json "s3://${{ steps.cfg.outputs.bucket }}/openapi.json" --cache-control "no-cache" || true
+          aws cloudfront create-invalidation --distribution-id "${{ steps.cfg.outputs.dist }}" --paths "/*"
+
+  smoke:
+    needs: [deploy-api, deploy-frontend]
+    if: always() && needs.deploy-api.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check
+        run: |
+          curl -fsS "${{ needs.deploy-api.outputs.api_url }}/api/health" | tee /tmp/health.json
+          grep -q '"status":"ok"' /tmp/health.json
+          curl -fsS "${{ needs.deploy-api.outputs.api_url }}/api/lms/providers" | tee /tmp/lms.json
+          grep -q 'providers' /tmp/lms.json

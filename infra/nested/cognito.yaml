@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SuperlativeBridge Cognito User Pool (email login, MFA optional, groups)
+
+Parameters:
+  Environment:
+    Type: String
+  CallbackURLs:
+    Type: String
+  LogoutURLs:
+    Type: String
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub sb-${Environment}-users
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: 'OPTIONAL'
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 7
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+        - Name: name
+          Required: true
+          Mutable: true
+        - Name: custom:role
+          AttributeDataType: String
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: '1'
+            MaxLength: '32'
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: admin
+      UserPoolId: !Ref UserPool
+      Description: Platform administrators
+      Precedence: 1
+
+  WorkerGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: worker
+      UserPoolId: !Ref UserPool
+      Description: GIG workers / learners
+      Precedence: 10
+
+  EmployerGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: employer
+      UserPoolId: !Ref UserPool
+      Description: Employer accounts
+      Precedence: 10
+
+  MentorGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: mentor
+      UserPoolId: !Ref UserPool
+      Description: Mentors
+      Precedence: 10
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub sb-${Environment}-web
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs: !Split [',', !Ref CallbackURLs]
+      LogoutURLs: !Split [',', !Ref LogoutURLs]
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub sb-${Environment}-${AWS::AccountId}
+      UserPoolId: !Ref UserPool
+
+Outputs:
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolArn:
+    Value: !GetAtt UserPool.Arn
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  HostedUIDomain:
+    Value: !Sub https://sb-${Environment}-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com

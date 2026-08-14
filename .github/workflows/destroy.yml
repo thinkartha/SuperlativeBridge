@@ -1,0 +1,53 @@
+name: Destroy SuperlativeBridge (AWS)
+
+# Removes API (SAM/Lambda) + infra (VPC/RDS/Cognito/S3/CloudFront/ACM) stacks.
+# Requires typing "destroy" to confirm. Irreversible for live data (RDS snapshot retained).
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to destroy
+        required: true
+        default: prod
+        type: choice
+        options: [dev, staging, prod]
+      confirm:
+        description: Type exactly "destroy" to proceed
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  ENVIRONMENT: ${{ github.event.inputs.environment }}
+  INFRA_STACK_NAME: superlativebridge-infra-${{ github.event.inputs.environment }}
+  SAM_STACK_NAME: superlativebridge-api-${{ github.event.inputs.environment }}
+
+permissions:
+  contents: read
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confirm destroy
+        run: |
+          if [[ "${{ github.event.inputs.confirm }}" != "destroy" ]]; then
+            echo "Confirmation failed. Type destroy exactly."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Destroy stacks
+        env:
+          CONFIRM: destroy
+        run: |
+          chmod +x scripts/destroy-aws.sh
+          ./scripts/destroy-aws.sh

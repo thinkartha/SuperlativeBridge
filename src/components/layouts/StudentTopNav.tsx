@@ -1,0 +1,59 @@
+import { Link, useLocation } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { BookOpen, User, Globe, LogOut, LayoutDashboard, Rocket, Users, Building2, FileText, GraduationCap, CalendarClock } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+
+const navItems = [
+  { title: "Dashboard", url: "/student", icon: LayoutDashboard },
+  { title: "Courses", url: "/courses", icon: BookOpen },
+  { title: "My Courses", url: "/courses/my", icon: GraduationCap },
+  { title: "Book Mentor", url: "/mentors/book", icon: CalendarClock },
+  { title: "Profile", url: "/profile", icon: User },
+  { title: "Gov Programs", url: "/programs", icon: Globe },
+  { title: "Visa", url: "/visa-programs", icon: FileText },
+  { title: "Entrepreneurs", url: "/entrepreneurship", icon: Rocket },
+  { title: "Marketplace", url: "/marketplace", icon: Building2 },
+  { title: "Community", url: "/community", icon: Users },
+];
+
+export default function StudentTopNav() {
+  const location = useLocation();
+  const { user, role, signOut } = useAuth();
+  const isActive = (url: string) => {
+    if (url === "/courses") return location.pathname === "/courses" || /^\/courses\/(?!my$)/.test(location.pathname);
+    return location.pathname === url || location.pathname.startsWith(url + "/");
+  };
+  const roleLabel = role === "mentor" ? "Mentor" : "GIG Worker";
+
+  return (
+    <nav className="sticky top-0 z-50 bg-card/95 backdrop-blur-sm border-b border-border">
+      <div className="flex items-center h-14 px-6 gap-1">
+        <Link to="/" className="font-heading font-bold text-lg text-foreground tracking-tight mr-6">
+          SuperlativeBridge
+        </Link>
+        {user?.name && <span className="text-sm text-foreground font-medium mr-2 hidden md:inline">{user.name}</span>}
+        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full mr-4">{roleLabel}</span>
+        <div className="flex items-center gap-0.5 flex-1 overflow-x-auto">
+          {navItems.map((item) => (
+            <Link
+              key={item.url}
+              to={item.url}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                isActive(item.url)
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <item.icon className="w-4 h-4" />
+              {item.title}
+            </Link>
+          ))}
+        </div>
+        <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground" onClick={signOut}>
+          <LogOut className="w-4 h-4" />
+          <span className="hidden sm:inline">Sign Out</span>
+        </Button>
+      </div>
+    </nav>
+  );
+}

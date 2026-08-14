@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  SuperlativeBridge root stack — VPC, RDS Postgres, Cognito, S3/CloudFront/ACM,
+  Secrets Manager, WAF, and nested SAM API (Go Lambdas).
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+  DomainName:
+    Type: String
+    Default: ''
+    Description: Optional custom domain (e.g. app.superlativebridge.org). Leave empty for CloudFront default domain.
+  HostedZoneId:
+    Type: String
+    Default: ''
+    Description: Route53 hosted zone ID when DomainName is set.
+  CertificateArn:
+    Type: String
+    Default: ''
+    Description: Existing ACM cert in us-east-1 for CloudFront. Empty = create DNS-validated cert when DomainName set.
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+  DbAllocatedStorage:
+    Type: Number
+    Default: 20
+  DbMasterUsername:
+    Type: String
+    Default: sbadmin
+  DbName:
+    Type: String
+    Default: superlativebridge
+  CognitoCallbackURLs:
+    Type: CommaDelimitedList
+    Default: 'http://localhost:8080/signin,http://localhost:8080/'
+  CognitoLogoutURLs:
+    Type: CommaDelimitedList
+    Default: 'http://localhost:8080/signin,http://localhost:8080/'
+
+Conditions:
+  HasDomain: !Not [!Equals [!Ref DomainName, '']]
+  HasHostedZone: !Not [!Equals [!Ref HostedZoneId, '']]
+  HasExternalCert: !Not [!Equals [!Ref CertificateArn, '']]
+  CreateCert: !And [!Condition HasDomain, !Not [!Condition HasExternalCert]]
+
+Resources:
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: nested/network.yaml
+      Parameters:
+        Environment: !Ref Environment
+
+  DatabaseStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: NetworkStack
+    Properties:
+      TemplateURL: nested/database.yaml
+      Parameters:
+        Environment: !Ref Environment
+        VpcId: !GetAtt NetworkStack.Outputs.VpcId
+        PrivateSubnetIds: !GetAtt NetworkStack.Outputs.PrivateSubnetIds
+        LambdaSecurityGroupId: !GetAtt NetworkStack.Outputs.LambdaSecurityGroupId
+        DbInstanceClass: !Ref DbInstanceClass
+        DbAllocatedStorage: !Ref DbAllocatedStorage
+        DbMasterUsername: !Ref DbMasterUsername
+        DbName: !Ref DbName
+
+  CognitoStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: nested/cognito.yaml
+      Parameters:
+        Environment: !Ref Environment
+        CallbackURLs: !Join [',', !Ref CognitoCallbackURLs]
+        LogoutURLs: !Join [',', !Ref CognitoLogoutURLs]
+
+  FrontendStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: nested/frontend.yaml
+      Parameters:
+        Environment: !Ref Environment
+        DomainName: !Ref DomainName
+        HostedZoneId: !Ref HostedZoneId
+        CertificateArn: !Ref CertificateArn
+
+Outputs:
+  VpcId:
+    Value: !GetAtt NetworkStack.Outputs.VpcId
+  PrivateSubnetIds:
+    Value: !GetAtt NetworkStack.Outputs.PrivateSubnetIds
+  PublicSubnetIds:
+    Value: !GetAtt NetworkStack.Outputs.PublicSubnetIds
+  LambdaSecurityGroupId:
+    Value: !GetAtt NetworkStack.Outputs.LambdaSecurityGroupId
+  RdsSecurityGroupId:
+    Value: !GetAtt DatabaseStack.Outputs.RdsSecurityGroupId
+  DbEndpoint:
+    Value: !GetAtt DatabaseStack.Outputs.DbEndpoint
+  DbPort:
+    Value: !GetAtt DatabaseStack.Outputs.DbPort
+  DbSecretArn:
+    Value: !GetAtt DatabaseStack.Outputs.DbSecretArn
+  DatabaseUrlSecretArn:
+    Value: !GetAtt DatabaseStack.Outputs.DatabaseUrlSecretArn
+  CognitoUserPoolId:
+    Value: !GetAtt CognitoStack.Outputs.UserPoolId
+  CognitoUserPoolClientId:
+    Value: !GetAtt CognitoStack.Outputs.UserPoolClientId
+  CognitoUserPoolArn:
+    Value: !GetAtt CognitoStack.Outputs.UserPoolArn
+  CognitoDomain:
+    Value: !GetAtt CognitoStack.Outputs.HostedUIDomain
+  WebBucketName:
+    Value: !GetAtt FrontendStack.Outputs.BucketName
+  CloudFrontDistributionId:
+    Value: !GetAtt FrontendStack.Outputs.DistributionId
+  CloudFrontDomainName:
+    Value: !GetAtt FrontendStack.Outputs.DistributionDomainName
+  WebsiteUrl:
+    Value: !GetAtt FrontendStack.Outputs.WebsiteUrl
+  CertificateArnOut:
+    Value: !GetAtt FrontendStack.Outputs.CertificateArn
+  EnvironmentName:
+    Value: !Ref Environment

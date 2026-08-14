@@ -1,0 +1,1454 @@
+{
+  "endplex": {
+    "schema": "https://endplex.com/schemas/collection/v1.json",
+    "version": 1
+  },
+  "info": {
+    "name": "SuperlativeBridge API",
+    "description": "One-click requests for every SuperlativeBridge endpoint. Import into EndPlex (endplex.com), pick an environment, run 'Auth / POST /api/auth/signin' first to capture {{token}} and {{userId}}, then run any folder."
+  },
+  "auth": {
+    "type": "bearer",
+    "token": "{{token}}"
+  },
+  "variables": [
+    {
+      "name": "baseUrl",
+      "value": "http://localhost:8081",
+      "description": "Local Go API (docker compose). Use the API Gateway stage URL for deployed environments."
+    },
+    {
+      "name": "demoEmail",
+      "value": "maria@example.com",
+      "description": "Demo GIG worker"
+    },
+    {
+      "name": "demoPassword",
+      "value": "password123",
+      "description": "Password for every seeded demo account"
+    },
+    {
+      "name": "token",
+      "value": "",
+      "description": "Filled automatically by the signin request"
+    },
+    {
+      "name": "userId",
+      "value": "",
+      "description": "Filled automatically by the signin request"
+    },
+    {
+      "name": "resourceId",
+      "value": "1",
+      "description": "Generic {id} path parameter"
+    },
+    {
+      "name": "courseId",
+      "value": "1"
+    },
+    {
+      "name": "categoryId",
+      "value": "1"
+    },
+    {
+      "name": "mentorId",
+      "value": "1"
+    }
+  ],
+  "environments": [
+    {
+      "name": "Local (docker compose)",
+      "variables": {
+        "baseUrl": "http://localhost:8081"
+      }
+    },
+    {
+      "name": "Local (vite proxy)",
+      "variables": {
+        "baseUrl": "http://localhost:8080"
+      }
+    },
+    {
+      "name": "Deployed (API Gateway)",
+      "variables": {
+        "baseUrl": "https://REPLACE.execute-api.us-east-1.amazonaws.com/prod"
+      }
+    }
+  ],
+  "demoAccounts": [
+    {
+      "role": "admin",
+      "email": "admin@example.com",
+      "password": "password123"
+    },
+    {
+      "role": "student (GIG worker)",
+      "email": "maria@example.com",
+      "password": "password123"
+    },
+    {
+      "role": "employer",
+      "email": "aisha@example.com",
+      "password": "password123"
+    },
+    {
+      "role": "mentor",
+      "email": "sarah.mentor@example.com",
+      "password": "password123"
+    }
+  ],
+  "folders": [
+    {
+      "name": "Platform",
+      "requests": [
+        {
+          "name": "GET /api/health",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "equals",
+              "value": 200
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "requests": [
+        {
+          "name": "POST /api/auth/signin",
+          "protocol": "rest",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/signin",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"email\": \"{{demoEmail}}\",\n  \"password\": \"{{demoPassword}}\"\n}"
+            }
+          },
+          "postRequest": {
+            "setVariables": [
+              {
+                "name": "token",
+                "from": "body",
+                "path": "token"
+              },
+              {
+                "name": "userId",
+                "from": "body",
+                "path": "user.id"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "POST /api/auth/signup",
+          "protocol": "rest",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/signup",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"name\": \"New Worker\",\n  \"email\": \"new.worker@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"student\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Catalog",
+      "requests": [
+        {
+          "name": "GET /api/courses",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/courses?search=cloud&category=&language=English&level=Beginner&page=1&pageSize=9",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "POST /api/courses",
+          "protocol": "rest",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/courses?search=cloud&category=&language=English&level=Beginner&page=1&pageSize=9",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"title\": \"New Course\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"level\": \"Beginner\",\n  \"language\": \"English\",\n  \"instructor\": \"Staff\",\n  \"vertical\": \"IT\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/courses/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/courses/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "PUT /api/courses/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/courses/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"title\": \"Updated Course\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "DELETE /api/courses/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/courses/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/categories",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/categories",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "POST /api/categories",
+          "protocol": "rest",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/categories",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"name\": \"New Category\",\n  \"slug\": \"new-category\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "PUT /api/categories/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/categories/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"name\": \"Updated Category\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "DELETE /api/categories/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/categories/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/mentors",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/mentors",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "POST /api/mentors",
+          "protocol": "rest",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/mentors",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"name\": \"New Mentor\",\n  \"expertise\": \"Cloud\",\n  \"bio\": \"Mentor bio\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/mentors/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/mentors/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "PUT /api/mentors/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/mentors/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"bio\": \"Updated bio\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "DELETE /api/mentors/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/mentors/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/mentors/{id}/availability",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/mentors/{{resourceId}}/availability",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "requests": [
+        {
+          "name": "GET /api/users",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "POST /api/users",
+          "protocol": "rest",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/users",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"name\": \"New User\",\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"student\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/users/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "PUT /api/users/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/users/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"name\": \"Updated Name\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "DELETE /api/users/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/users/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/users/{id}/enrollments",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users/{{resourceId}}/enrollments",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/users/{id}/certifications",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users/{{resourceId}}/certifications",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/users/{id}/notifications",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users/{{resourceId}}/notifications",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/users/{id}/dashboard",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users/{{resourceId}}/dashboard",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/users/{id}/saved-courses",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users/{{resourceId}}/saved-courses",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/users/{id}/mentor-bookings",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users/{{resourceId}}/mentor-bookings",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/admin/stats",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/admin/stats",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Learning",
+      "requests": [
+        {
+          "name": "POST /api/enrollments",
+          "protocol": "rest",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/enrollments",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"courseId\": \"{{courseId}}\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "PATCH /api/enrollments/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/enrollments/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"progress\": 45,\n  \"xpEarned\": 120\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "DELETE /api/enrollments/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/enrollments/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "POST /api/saved-courses",
+          "protocol": "rest",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/saved-courses",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"courseId\": \"{{courseId}}\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "DELETE /api/saved-courses/{courseId}",
+          "protocol": "rest",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/saved-courses/{{courseId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "POST /api/mentor-bookings",
+          "protocol": "rest",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/mentor-bookings",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"mentorId\": \"{{mentorId}}\",\n  \"scheduledAt\": \"2026-09-01T15:00:00Z\",\n  \"topic\": \"Resume review\",\n  \"notes\": \"First session\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "PATCH /api/mentor-bookings/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/mentor-bookings/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "language": "json",
+              "raw": "{\n  \"status\": \"confirmed\"\n}"
+            }
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Programs",
+      "requests": [
+        {
+          "name": "GET /api/programs",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/programs",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/programs/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/programs/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/visa-programs",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/visa-programs",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/entrepreneurship",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/entrepreneurship",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Community",
+      "requests": [
+        {
+          "name": "GET /api/marketplace",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/marketplace?page=1&pageSize=10",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/community",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/community",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Employer",
+      "requests": [
+        {
+          "name": "GET /api/employer/analytics",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/employer/analytics?from=2026-01-01&to=2026-12-31",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/employer/analytics/export",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/employer/analytics/export?format=csv",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/candidates",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/candidates?page=1&pageSize=10",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        },
+        {
+          "name": "GET /api/candidates/{id}",
+          "protocol": "rest",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/candidates/{{resourceId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          },
+          "tests": [
+            {
+              "assert": "status",
+              "operator": "lessThan",
+              "value": 400
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
