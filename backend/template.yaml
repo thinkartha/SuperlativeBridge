@@ -109,9 +109,6 @@ Resources:
       MethodSettings:
         - ResourcePath: '/*'
           HttpMethod: '*'
-          # INFO requires account-level ApiGateway CloudWatch role; keep OFF until infra sets it.
-          LoggingLevel: OFF
-          DataTraceEnabled: false
           MetricsEnabled: true
       Cors:
         # SAM parameter overrides strip quotes; wrap here for API Gateway mapping.
