@@ -104,4 +104,9 @@ $r$)
 )
 WHERE NOT EXISTS (SELECT 1 FROM candidates c WHERE c.email = v.email);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sbuser;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sbuser') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sbuser;
+  END IF;
+END $$;

@@ -315,8 +315,13 @@ INSERT INTO pipeline_runs (id, pipeline_id, run_number, status, trigger, started
  '{"durationMs":67000,"successRate":0.0,"apiCalls":3,"errorCount":1,"p95TaskMs":40000}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sbuser;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO sbuser;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sbuser') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sbuser;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO sbuser;
+  END IF;
+END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'vivekvardhan') THEN

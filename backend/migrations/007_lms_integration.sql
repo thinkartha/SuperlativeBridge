@@ -91,8 +91,13 @@ INSERT INTO lms_providers (id, slug, name, kind, status, base_url, description, 
  '{"raas":"INT_Learning_Catalog"}'::jsonb)
 ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, config = EXCLUDED.config;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sbuser;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO sbuser;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sbuser') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sbuser;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO sbuser;
+  END IF;
+END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'vivekvardhan') THEN

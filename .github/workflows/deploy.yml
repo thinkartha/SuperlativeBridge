@@ -236,6 +236,10 @@ jobs:
             --cli-binary-format raw-in-base64-out \
             /tmp/migrate-out.json
           cat /tmp/migrate-out.json
+          if jq -e '.errorMessage' /tmp/migrate-out.json >/dev/null 2>&1; then
+            echo "Migration failed"
+            exit 1
+          fi
 
   deploy-frontend:
     needs: [deploy-api, deploy-infra]
@@ -296,7 +300,14 @@ jobs:
     steps:
       - name: Health check
         run: |
-          curl -fsS "${{ needs.deploy-api.outputs.api_url }}/api/health" | tee /tmp/health.json
+          API="${{ needs.deploy-api.outputs.api_url }}"
+          for i in $(seq 1 12); do
+            if curl -fsS "$API/api/health" | tee /tmp/health.json | grep -q '"status":"ok"'; then
+              break
+            fi
+            echo "Waiting for API stage ($i/12)…"
+            sleep 15
+          done
           grep -q '"status":"ok"' /tmp/health.json
-          curl -fsS "${{ needs.deploy-api.outputs.api_url }}/api/lms/providers" | tee /tmp/lms.json
+          curl -fsS "$API/api/lms/providers" | tee /tmp/lms.json
           grep -q 'providers' /tmp/lms.json
