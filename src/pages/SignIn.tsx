@@ -27,6 +27,8 @@ const roleRedirect: Record<Role, string> = {
   mentor: "/mentor",
 };
 
+const showDemoSwitcher = import.meta.env.DEV;
+
 const SignIn = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -185,38 +187,39 @@ const SignIn = () => {
             </Button>
           </form>
 
-          {/* Demo account switcher */}
-          <div className="mt-8 border border-border p-4 bg-muted/30">
-            <p className="text-xs font-medium text-foreground mb-1">
-              Demo account switcher
-            </p>
-            <p className="text-xs text-muted-foreground mb-3">
-              One click signs you in and redirects to that role's dashboard.
-            </p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {demoAccounts.map((a) => (
-                <Button
-                  key={a.email}
-                  type="button"
-                  variant="outline"
-                  className="h-auto flex-col items-start gap-0.5 py-2 text-left"
-                  disabled={submitting}
-                  onClick={() => {
-                    setEmail(a.email);
-                    setPassword(a.password);
-                    void handleDemoLogin(a.email, a.password);
-                  }}
-                >
-                  <span className="text-sm font-medium text-foreground">
-                    {submitting && email === a.email ? "Signing in…" : a.role}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-normal">
-                    {a.email}
-                  </span>
-                </Button>
-              ))}
+          {showDemoSwitcher && (
+            <div className="mt-8 border border-border p-4 bg-muted/30">
+              <p className="text-xs font-medium text-foreground mb-1">
+                Demo account switcher
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                One click signs you in and redirects to that role's dashboard.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {demoAccounts.map((a) => (
+                  <Button
+                    key={a.email}
+                    type="button"
+                    variant="outline"
+                    className="h-auto flex-col items-start gap-0.5 py-2 text-left"
+                    disabled={submitting}
+                    onClick={() => {
+                      setEmail(a.email);
+                      setPassword(a.password);
+                      void handleDemoLogin(a.email, a.password);
+                    }}
+                  >
+                    <span className="text-sm font-medium text-foreground">
+                      {submitting && email === a.email ? "Signing in…" : a.role}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-normal">
+                      {a.email}
+                    </span>
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <p className="text-center text-muted-foreground text-sm mt-6">
             Don't have an account?{" "}
