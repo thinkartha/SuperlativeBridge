@@ -156,6 +156,17 @@ jobs:
             echo "database_url=${{ secrets.DATABASE_URL }}" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Remove failed API stack if stuck in ROLLBACK_COMPLETE
+        run: |
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$SAM_STACK_NAME" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo NOT_FOUND)
+          echo "API stack status: $STATUS"
+          if [[ "$STATUS" == "ROLLBACK_COMPLETE" || "$STATUS" == "ROLLBACK_FAILED" || "$STATUS" == "CREATE_FAILED" ]]; then
+            echo "Deleting stuck stack $SAM_STACK_NAME…"
+            aws cloudformation delete-stack --stack-name "$SAM_STACK_NAME"
+            aws cloudformation wait stack-delete-complete --stack-name "$SAM_STACK_NAME"
+          fi
+
       - name: Sync migrations into migrate Lambda
         run: |
           mkdir -p backend/cmd/migrate/migrations
@@ -173,12 +184,12 @@ jobs:
           LMS_API_KEY: ${{ secrets.LMS_API_KEY }}
           INTEGRATION_WEBHOOK_SECRET: ${{ secrets.INTEGRATION_WEBHOOK_SECRET }}
         run: |
-          # SAM Cors.AllowOrigin must be a quoted literal: 'https://example.com' or '*'
+          # Bare origin (no quotes) — template wraps with !Sub "'${CorsAllowOrigin}'"
           WEB_URL="${{ steps.infra.outputs.website_url }}"
           if [[ -z "$WEB_URL" || "$WEB_URL" == "None" ]]; then
-            CORS="'*'"
+            CORS='*'
           else
-            CORS="'${WEB_URL}'"
+            CORS="$WEB_URL"
           fi
           # Empty secrets break sam --parameter-overrides; fall back to placeholders.
           JWT_SECRET="${JWT_SECRET:-change-me-jwt-secret}"

@@ -43,7 +43,8 @@ Parameters:
     Default: ''
   CorsAllowOrigin:
     Type: String
-    Default: "'*'"
+    Default: '*'
+    Description: Browser origin allowed by API Gateway CORS (no surrounding quotes).
 
 Conditions:
   UseVpc: !Not [!Equals [!Join ['', !Ref VpcSubnetIds], '']]
@@ -112,7 +113,8 @@ Resources:
           DataTraceEnabled: false
           MetricsEnabled: true
       Cors:
-        AllowOrigin: !Ref CorsAllowOrigin
+        # SAM parameter overrides strip quotes; wrap here for API Gateway mapping.
+        AllowOrigin: !Sub "'${CorsAllowOrigin}'"
         AllowHeaders: "'Content-Type,Authorization,X-Api-Key,X-SB-Signature,X-SB-Timestamp,X-Request-Id'"
         AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
       # Always attach Cognito authorizer in AWS deploys (pool ARN is required there).
