@@ -1,4 +1,4 @@
-.PHONY: dev up down logs reset health
+.PHONY: dev up down logs reset health test build
 
 # One command: Postgres (pre-seeded) + Go API + Vite frontend
 dev:
@@ -20,3 +20,11 @@ logs:
 
 health:
 	curl -s http://localhost:8081/api/health | head -40
+
+test:
+	cd backend && go test ./...
+	npm test
+
+build: test
+	cd backend && go build ./...
+	npm run build

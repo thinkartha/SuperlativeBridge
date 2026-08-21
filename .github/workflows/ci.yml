@@ -22,6 +22,7 @@ jobs:
       - working-directory: backend
         run: |
           go vet ./...
+          go test ./...
           go build ./...
 
   web:
@@ -33,6 +34,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm test
       - run: npm run build
         env:
           VITE_API_BASE_URL: http://localhost:8081

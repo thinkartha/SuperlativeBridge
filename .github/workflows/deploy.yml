@@ -37,16 +37,18 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: backend/go.sum
-      - name: Go vet / build
+      - name: Go vet / test / build
         working-directory: backend
         run: |
           go vet ./...
+          go test ./...
           go build ./...
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
+      - run: npm test
       - run: npm run build
         env:
           VITE_API_BASE_URL: https://example.invalid
