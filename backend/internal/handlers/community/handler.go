@@ -82,7 +82,7 @@ func listCommunity(ctx context.Context) (events.APIGatewayProxyResponse, error) 
 }
 
 func rsvpEvent(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	if _, err := auth.FromRequest(req.Headers); err != nil {
+	if _, err := auth.FromRequest(ctx, req.Headers); err != nil {
 		return response.Error(401, "unauthorized"), nil
 	}
 	id := req.PathParameters["id"]

@@ -109,6 +109,8 @@ var routes = []route{
 	{"POST", "/api/auth/signin", auth.Handler},
 	{"POST", "/api/auth/signup", auth.Handler},
 	{"GET", "/api/auth/cognito-config", auth.Handler},
+	{"GET", "/api/auth/me", auth.Handler},
+	{"POST", "/api/auth/provision", auth.Handler},
 
 	{"GET", "/api/programs", programs.Handler},
 	{"GET", "/api/programs/{id}", programs.Handler},

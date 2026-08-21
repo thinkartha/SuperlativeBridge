@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, isCognitoAuthMode } from "@/contexts/AuthContext";
 import type { Role } from "@/types/api";
 
 const steps = ["Account", "Role", "Details"];
@@ -39,8 +39,10 @@ const SignUp = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [awaitingConfirm, setAwaitingConfirm] = useState(false);
+  const [confirmCode, setConfirmCode] = useState("");
   const { toast } = useToast();
-  const { signUp } = useAuth();
+  const { signUp, confirmSignUp, signIn } = useAuth();
   const navigate = useNavigate();
 
   const update = (field: string, value: string) =>
@@ -95,6 +97,14 @@ const SignUp = () => {
       });
       navigate(roleRedirect[user.role] || "/courses");
     } catch (err) {
+      if (err instanceof Error && err.message === "CONFIRM_EMAIL") {
+        setAwaitingConfirm(true);
+        toast({
+          title: "Verify your email",
+          description: "Enter the confirmation code Cognito sent to your inbox.",
+        });
+        return;
+      }
       toast({
         title: "Sign up failed",
         description:
@@ -107,6 +117,68 @@ const SignUp = () => {
       setSubmitting(false);
     }
   };
+
+  const handleConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!confirmCode) {
+      toast({
+        title: "Error",
+        description: "Enter the verification code from your email.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await confirmSignUp(formData.email, confirmCode);
+      const user = await signIn(formData.email, formData.password);
+      toast({
+        title: "Account verified!",
+        description: "Welcome to SuperlativeBridge.",
+      });
+      navigate(roleRedirect[user.role] || "/courses");
+    } catch (err) {
+      toast({
+        title: "Verification failed",
+        description:
+          err instanceof Error ? err.message : "Could not verify your account.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (awaitingConfirm) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-8">
+        <div className="w-full max-w-md space-y-6">
+          <h1 className="text-3xl font-heading font-bold text-foreground">
+            Confirm your email
+          </h1>
+          <p className="text-muted-foreground">
+            We sent a verification code to {formData.email}. Enter it below to
+            activate your account.
+          </p>
+          <form onSubmit={handleConfirm} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="confirmCode">Verification code</Label>
+              <Input
+                id="confirmCode"
+                value={confirmCode}
+                onChange={(e) => setConfirmCode(e.target.value)}
+                placeholder="123456"
+                className="h-12"
+              />
+            </div>
+            <Button type="submit" variant="hero" className="w-full h-12" disabled={submitting}>
+              {submitting ? "Verifying..." : "Verify and sign in"}
+            </Button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex">

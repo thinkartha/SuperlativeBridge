@@ -20,6 +20,7 @@ func CheckPassword(hash, pw string) bool {
 
 type Claims struct {
 	UserID string `json:"userId"`
+	Email  string `json:"email,omitempty"`
 	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }

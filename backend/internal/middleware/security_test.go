@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,6 +15,7 @@ import (
 func TestRequireUserAndRequireAdmin(t *testing.T) {
 	t.Setenv("JWT_SECRET", "unit-test-secret")
 	t.Setenv("COGNITO_USER_POOL_ID", "")
+	ctx := context.Background()
 
 	adminToken, err := authpkg.GenerateToken("admin-1", "admin")
 	if err != nil {
@@ -24,22 +26,22 @@ func TestRequireUserAndRequireAdmin(t *testing.T) {
 		t.Fatalf("GenerateToken: %v", err)
 	}
 
-	_, res, ok := RequireUser(map[string]string{})
+	_, res, ok := RequireUser(ctx, map[string]string{})
 	if ok || res.StatusCode != 401 {
 		t.Fatalf("RequireUser without header: ok=%v status=%d", ok, res.StatusCode)
 	}
 
-	claims, res, ok := RequireUser(map[string]string{"Authorization": "Bearer " + adminToken})
+	claims, res, ok := RequireUser(ctx, map[string]string{"Authorization": "Bearer " + adminToken})
 	if !ok || res.StatusCode != 0 || claims.Role != "admin" {
 		t.Fatalf("RequireUser admin: ok=%v status=%d role=%q", ok, res.StatusCode, claims.Role)
 	}
 
-	_, res, ok = RequireAdmin(map[string]string{"Authorization": "Bearer " + workerToken})
+	_, res, ok = RequireAdmin(ctx, map[string]string{"Authorization": "Bearer " + workerToken})
 	if ok || res.StatusCode != 403 {
 		t.Fatalf("RequireAdmin worker: ok=%v status=%d", ok, res.StatusCode)
 	}
 
-	claims, res, ok = RequireAdmin(map[string]string{"Authorization": "Bearer " + adminToken})
+	claims, res, ok = RequireAdmin(ctx, map[string]string{"Authorization": "Bearer " + adminToken})
 	if !ok || res.StatusCode != 0 || claims.Role != "admin" {
 		t.Fatalf("RequireAdmin admin: ok=%v status=%d", ok, res.StatusCode)
 	}

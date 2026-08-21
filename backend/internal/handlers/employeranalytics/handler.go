@@ -14,7 +14,7 @@ import (
 )
 
 func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	claims, err := auth.FromRequest(req.Headers)
+	claims, err := auth.FromRequest(ctx, req.Headers)
 	if err != nil {
 		return response.Error(401, "unauthorized"), nil
 	}

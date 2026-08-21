@@ -235,7 +235,7 @@ func importCourses(ctx context.Context, req events.APIGatewayProxyRequest) (even
 }
 
 func syncProvider(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	if _, res, ok := middleware.RequireAdmin(req.Headers); !ok {
+	if _, res, ok := middleware.RequireAdmin(ctx, req.Headers); !ok {
 		return res, nil
 	}
 	var body struct {
@@ -308,7 +308,7 @@ func handleWebhook(ctx context.Context, req events.APIGatewayProxyRequest) (even
 }
 
 func listJobs(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	if _, res, ok := middleware.RequireAdmin(req.Headers); !ok {
+	if _, res, ok := middleware.RequireAdmin(ctx, req.Headers); !ok {
 		return res, nil
 	}
 	pool, err := db.Pool(ctx)

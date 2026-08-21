@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, isCognitoAuthMode } from "@/contexts/AuthContext";
 import type { Role } from "@/types/api";
 
 // Seeded local/demo accounts (see backend/migrations/002_seed.sql)
@@ -129,7 +129,9 @@ const SignIn = () => {
             Sign In
           </h1>
           <p className="text-muted-foreground mb-8">
-            Enter your credentials to access your account
+            {isCognitoAuthMode
+              ? "Sign in with your SuperlativeBridge account"
+              : "Enter your credentials to access your account"}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
