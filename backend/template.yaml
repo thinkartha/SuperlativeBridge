@@ -109,7 +109,8 @@ Resources:
       MethodSettings:
         - ResourcePath: '/*'
           HttpMethod: '*'
-          LoggingLevel: INFO
+          # INFO requires account-level ApiGateway CloudWatch role; keep OFF until infra sets it.
+          LoggingLevel: OFF
           DataTraceEnabled: false
           MetricsEnabled: true
       Cors:
