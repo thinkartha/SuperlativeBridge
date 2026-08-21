@@ -168,9 +168,17 @@ jobs:
       - name: SAM Deploy (Go Lambdas + API Gateway)
         id: deploy
         working-directory: backend
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          LMS_API_KEY: ${{ secrets.LMS_API_KEY }}
+          INTEGRATION_WEBHOOK_SECRET: ${{ secrets.INTEGRATION_WEBHOOK_SECRET }}
         run: |
           CORS="'${{ steps.infra.outputs.website_url }}'"
           [[ -z "${{ steps.infra.outputs.website_url }}" || "${{ steps.infra.outputs.website_url }}" == "None" ]] && CORS="'*'"
+          # Empty secrets break sam --parameter-overrides; fall back to placeholders.
+          JWT_SECRET="${JWT_SECRET:-change-me-jwt-secret}"
+          LMS_API_KEY="${LMS_API_KEY:-unset}"
+          INTEGRATION_WEBHOOK_SECRET="${INTEGRATION_WEBHOOK_SECRET:-unset}"
           sam deploy \
             --stack-name "$SAM_STACK_NAME" \
             --no-confirm-changeset \
@@ -181,14 +189,14 @@ jobs:
               Environment="$ENVIRONMENT" \
               DatabaseUrl="${{ steps.dsn.outputs.database_url }}" \
               DatabaseUrlSecretArn="${{ steps.infra.outputs.db_secret_arn }}" \
-              JwtSecret="${{ secrets.JWT_SECRET }}" \
+              JwtSecret="$JWT_SECRET" \
               CognitoUserPoolArn="${{ steps.infra.outputs.cognito_pool_arn }}" \
               CognitoUserPoolId="${{ steps.infra.outputs.cognito_pool_id }}" \
               CognitoUserPoolClientId="${{ steps.infra.outputs.cognito_client_id }}" \
               VpcSubnetIds="${{ steps.infra.outputs.private_subnets }}" \
               LambdaSecurityGroupId="${{ steps.infra.outputs.lambda_sg }}" \
-              LmsApiKey="${{ secrets.LMS_API_KEY }}" \
-              IntegrationWebhookSecret="${{ secrets.INTEGRATION_WEBHOOK_SECRET }}" \
+              LmsApiKey="$LMS_API_KEY" \
+              IntegrationWebhookSecret="$INTEGRATION_WEBHOOK_SECRET" \
               CorsAllowOrigin="$CORS"
           API_URL=$(aws cloudformation describe-stacks --stack-name "$SAM_STACK_NAME" \
             --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
