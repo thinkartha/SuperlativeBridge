@@ -161,6 +161,13 @@ jobs:
           STATUS=$(aws cloudformation describe-stacks --stack-name "$SAM_STACK_NAME" \
             --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo NOT_FOUND)
           echo "API stack status: $STATUS"
+          if [[ "$STATUS" == "ROLLBACK_IN_PROGRESS" ]]; then
+            echo "Waiting for in-flight rollback to finish…"
+            aws cloudformation wait stack-rollback-complete --stack-name "$SAM_STACK_NAME"
+            STATUS=$(aws cloudformation describe-stacks --stack-name "$SAM_STACK_NAME" \
+              --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo NOT_FOUND)
+            echo "API stack status after rollback: $STATUS"
+          fi
           if [[ "$STATUS" == "ROLLBACK_COMPLETE" || "$STATUS" == "ROLLBACK_FAILED" || "$STATUS" == "CREATE_FAILED" ]]; then
             echo "Deleting stuck stack $SAM_STACK_NAME…"
             aws cloudformation delete-stack --stack-name "$SAM_STACK_NAME"
