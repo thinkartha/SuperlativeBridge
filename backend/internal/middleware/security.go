@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -32,8 +33,8 @@ func SecurityHeaders() map[string]string {
 }
 
 // RequireUser validates Cognito or local JWT and returns claims.
-func RequireUser(headers map[string]string) (*auth.Claims, events.APIGatewayProxyResponse, bool) {
-	claims, err := auth.FromRequest(headers)
+func RequireUser(ctx context.Context, headers map[string]string) (*auth.Claims, events.APIGatewayProxyResponse, bool) {
+	claims, err := auth.FromRequest(ctx, headers)
 	if err != nil {
 		return nil, response.Error(401, "unauthorized"), false
 	}
@@ -41,8 +42,8 @@ func RequireUser(headers map[string]string) (*auth.Claims, events.APIGatewayProx
 }
 
 // RequireAdmin ensures the caller is an admin.
-func RequireAdmin(headers map[string]string) (*auth.Claims, events.APIGatewayProxyResponse, bool) {
-	claims, res, ok := RequireUser(headers)
+func RequireAdmin(ctx context.Context, headers map[string]string) (*auth.Claims, events.APIGatewayProxyResponse, bool) {
+	claims, res, ok := RequireUser(ctx, headers)
 	if !ok {
 		return nil, res, false
 	}

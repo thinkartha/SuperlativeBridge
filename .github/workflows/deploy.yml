@@ -65,6 +65,7 @@ jobs:
       cognito_pool_id: ${{ steps.outs.outputs.cognito_pool_id }}
       cognito_pool_arn: ${{ steps.outs.outputs.cognito_pool_arn }}
       cognito_client_id: ${{ steps.outs.outputs.cognito_client_id }}
+      cognito_domain: ${{ steps.outs.outputs.cognito_domain }}
       web_bucket: ${{ steps.outs.outputs.web_bucket }}
       cf_dist_id: ${{ steps.outs.outputs.cf_dist_id }}
       website_url: ${{ steps.outs.outputs.website_url }}
@@ -98,6 +99,7 @@ jobs:
           echo "cognito_pool_id=$(q CognitoUserPoolId)" >> "$GITHUB_OUTPUT"
           echo "cognito_pool_arn=$(q CognitoUserPoolArn)" >> "$GITHUB_OUTPUT"
           echo "cognito_client_id=$(q CognitoUserPoolClientId)" >> "$GITHUB_OUTPUT"
+          echo "cognito_domain=$(q CognitoDomain)" >> "$GITHUB_OUTPUT"
           echo "web_bucket=$(q WebBucketName)" >> "$GITHUB_OUTPUT"
           echo "cf_dist_id=$(q CloudFrontDistributionId)" >> "$GITHUB_OUTPUT"
           echo "website_url=$(q WebsiteUrl)" >> "$GITHUB_OUTPUT"
@@ -133,6 +135,7 @@ jobs:
             echo "cognito_pool_id=${{ needs.deploy-infra.outputs.cognito_pool_id }}" >> "$GITHUB_OUTPUT"
             echo "cognito_pool_arn=${{ needs.deploy-infra.outputs.cognito_pool_arn }}" >> "$GITHUB_OUTPUT"
             echo "cognito_client_id=${{ needs.deploy-infra.outputs.cognito_client_id }}" >> "$GITHUB_OUTPUT"
+            echo "cognito_domain=${{ needs.deploy-infra.outputs.cognito_domain }}" >> "$GITHUB_OUTPUT"
             echo "website_url=${{ needs.deploy-infra.outputs.website_url }}" >> "$GITHUB_OUTPUT"
           else
             q() { aws cloudformation describe-stacks --stack-name "$INFRA_STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text 2>/dev/null || true; }
@@ -142,6 +145,7 @@ jobs:
             echo "cognito_pool_id=$(q CognitoUserPoolId)" >> "$GITHUB_OUTPUT"
             echo "cognito_pool_arn=$(q CognitoUserPoolArn)" >> "$GITHUB_OUTPUT"
             echo "cognito_client_id=$(q CognitoUserPoolClientId)" >> "$GITHUB_OUTPUT"
+            echo "cognito_domain=$(q CognitoDomain)" >> "$GITHUB_OUTPUT"
             echo "website_url=$(q WebsiteUrl)" >> "$GITHUB_OUTPUT"
           fi
 
@@ -218,6 +222,7 @@ jobs:
               CognitoUserPoolArn="${{ steps.infra.outputs.cognito_pool_arn }}" \
               CognitoUserPoolId="${{ steps.infra.outputs.cognito_pool_id }}" \
               CognitoUserPoolClientId="${{ steps.infra.outputs.cognito_client_id }}" \
+              CognitoDomain="${{ steps.infra.outputs.cognito_domain }}" \
               VpcSubnetIds="${{ steps.infra.outputs.private_subnets }}" \
               LambdaSecurityGroupId="${{ steps.infra.outputs.lambda_sg }}" \
               LmsApiKey="$LMS_API_KEY" \
@@ -268,12 +273,14 @@ jobs:
             echo "dist=${{ needs.deploy-infra.outputs.cf_dist_id }}" >> "$GITHUB_OUTPUT"
             echo "cognito_pool=${{ needs.deploy-infra.outputs.cognito_pool_id }}" >> "$GITHUB_OUTPUT"
             echo "cognito_client=${{ needs.deploy-infra.outputs.cognito_client_id }}" >> "$GITHUB_OUTPUT"
+            echo "cognito_domain=${{ needs.deploy-infra.outputs.cognito_domain }}" >> "$GITHUB_OUTPUT"
           else
             q() { aws cloudformation describe-stacks --stack-name "$INFRA_STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
             echo "bucket=$(q WebBucketName)" >> "$GITHUB_OUTPUT"
             echo "dist=$(q CloudFrontDistributionId)" >> "$GITHUB_OUTPUT"
             echo "cognito_pool=$(q CognitoUserPoolId)" >> "$GITHUB_OUTPUT"
             echo "cognito_client=$(q CognitoUserPoolClientId)" >> "$GITHUB_OUTPUT"
+            echo "cognito_domain=$(q CognitoDomain)" >> "$GITHUB_OUTPUT"
           fi
           echo "api_url=${{ needs.deploy-api.outputs.api_url }}" >> "$GITHUB_OUTPUT"
 
@@ -284,6 +291,7 @@ jobs:
           VITE_COGNITO_USER_POOL_ID: ${{ steps.cfg.outputs.cognito_pool }}
           VITE_COGNITO_CLIENT_ID: ${{ steps.cfg.outputs.cognito_client }}
           VITE_COGNITO_REGION: ${{ env.AWS_REGION }}
+          VITE_COGNITO_DOMAIN: ${{ steps.cfg.outputs.cognito_domain }}
           VITE_AUTH_MODE: cognito
         run: npm run build
 

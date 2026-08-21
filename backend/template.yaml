@@ -27,6 +27,10 @@ Parameters:
   CognitoUserPoolClientId:
     Type: String
     Default: ''
+  CognitoDomain:
+    Type: String
+    Default: ''
+    Description: Cognito hosted UI domain URL for the web client.
   VpcSubnetIds:
     Type: CommaDelimitedList
     Default: ''
@@ -64,6 +68,7 @@ Globals:
         JWT_SECRET: !Ref JwtSecret
         COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
         COGNITO_CLIENT_ID: !Ref CognitoUserPoolClientId
+        COGNITO_DOMAIN: !Ref CognitoDomain
         LMS_API_KEY: !Ref LmsApiKey
         INTEGRATION_WEBHOOK_SECRET: !Ref IntegrationWebhookSecret
         ENVIRONMENT: !Ref Environment
@@ -371,6 +376,22 @@ Resources:
             RestApiId: !Ref Api
             Path: /api/auth/cognito-config
             Method: GET
+            Auth:
+              Authorizer: NONE
+        Me:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/auth/me
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        Provision:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /api/auth/provision
+            Method: POST
             Auth:
               Authorizer: NONE
 

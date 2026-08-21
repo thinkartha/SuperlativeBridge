@@ -92,3 +92,43 @@ func TestHandler_NotFound(t *testing.T) {
 		t.Fatalf("status = %d, want 404", res.StatusCode)
 	}
 }
+
+func TestHandler_Me_Unauthorized(t *testing.T) {
+	res, err := Handler(context.Background(), events.APIGatewayProxyRequest{
+		Resource:   "/api/auth/me",
+		HTTPMethod: "GET",
+	})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	if res.StatusCode != 401 {
+		t.Fatalf("status = %d, want 401", res.StatusCode)
+	}
+}
+
+func TestHandler_Provision_RequiresCognitoToken(t *testing.T) {
+	t.Setenv("COGNITO_USER_POOL_ID", "us-east-1_pool")
+	res, err := Handler(context.Background(), events.APIGatewayProxyRequest{
+		Resource:   "/api/auth/provision",
+		HTTPMethod: "POST",
+	})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	if res.StatusCode != 401 {
+		t.Fatalf("status = %d, want 401", res.StatusCode)
+	}
+}
+
+func TestHandler_Me_MethodNotAllowed(t *testing.T) {
+	res, err := Handler(context.Background(), events.APIGatewayProxyRequest{
+		Resource:   "/api/auth/me",
+		HTTPMethod: "POST",
+	})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	if res.StatusCode != 405 {
+		t.Fatalf("status = %d, want 405", res.StatusCode)
+	}
+}

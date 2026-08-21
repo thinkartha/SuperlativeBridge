@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -67,7 +68,7 @@ func TestFromRequest(t *testing.T) {
 		t.Fatalf("GenerateToken: %v", err)
 	}
 
-	claims, err := FromRequest(map[string]string{
+	claims, err := FromRequest(context.Background(), map[string]string{
 		"Authorization": "Bearer " + token,
 	})
 	if err != nil {
@@ -77,7 +78,7 @@ func TestFromRequest(t *testing.T) {
 		t.Fatalf("claims mismatch: %+v", claims)
 	}
 
-	_, err = FromRequest(map[string]string{})
+	_, err = FromRequest(context.Background(), map[string]string{})
 	if err == nil || !strings.Contains(err.Error(), "missing authorization") {
 		t.Fatalf("expected missing authorization error, got %v", err)
 	}

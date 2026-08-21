@@ -16,19 +16,19 @@ import (
 
 func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	if strings.Contains(req.Resource, "/run") && req.HTTPMethod == "POST" {
-		if _, err := auth.FromRequest(req.Headers); err != nil {
+		if _, err := auth.FromRequest(ctx, req.Headers); err != nil {
 			return response.Error(401, "unauthorized"), nil
 		}
 		return runPipeline(ctx, req)
 	}
 	if strings.Contains(req.Resource, "/pipelines/") && req.HTTPMethod == "PUT" {
-		if _, err := auth.FromRequest(req.Headers); err != nil {
+		if _, err := auth.FromRequest(ctx, req.Headers); err != nil {
 			return response.Error(401, "unauthorized"), nil
 		}
 		return updatePipelineSettings(ctx, req)
 	}
 	if req.HTTPMethod == "PUT" {
-		if _, err := auth.FromRequest(req.Headers); err != nil {
+		if _, err := auth.FromRequest(ctx, req.Headers); err != nil {
 			return response.Error(401, "unauthorized"), nil
 		}
 		if id, ok := req.PathParameters["id"]; ok && id != "" {

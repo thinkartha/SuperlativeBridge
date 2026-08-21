@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
@@ -13,11 +14,15 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
+
+	"github.com/superlativebridge/backend/internal/db"
 )
 
 // FromRequest extracts and validates the bearer token — Cognito JWT when
 // COGNITO_USER_POOL_ID is set, otherwise local HS256 JWT_SECRET tokens.
-func FromRequest(headers map[string]string) (*Claims, error) {
+// When Cognito is enabled, maps the caller to a Postgres users.id when linked.
+func FromRequest(ctx context.Context, headers map[string]string) (*Claims, error) {
 	var raw string
 	for k, v := range headers {
 		if strings.EqualFold(k, "Authorization") {
@@ -34,12 +39,44 @@ func FromRequest(headers map[string]string) (*Claims, error) {
 		token = parts[1]
 	}
 
+	var claims *Claims
+	var err error
 	if os.Getenv("COGNITO_USER_POOL_ID") != "" {
-		if claims, err := ParseCognitoToken(token); err == nil {
-			return claims, nil
+		if claims, err = ParseCognitoToken(token); err == nil {
+			return resolvePostgresUser(ctx, claims)
 		}
 	}
-	return ParseToken(token)
+	claims, err = ParseToken(token)
+	if err != nil {
+		return nil, err
+	}
+	return claims, nil
+}
+
+func resolvePostgresUser(ctx context.Context, claims *Claims) (*Claims, error) {
+	if ctx == nil || os.Getenv("COGNITO_USER_POOL_ID") == "" {
+		return claims, nil
+	}
+	pool, err := db.Pool(ctx)
+	if err != nil {
+		return claims, nil
+	}
+	var pgID, pgRole string
+	err = pool.QueryRow(ctx,
+		`SELECT id, role FROM users WHERE cognito_sub = $1 OR ($2 <> '' AND lower(email) = lower($2))`,
+		claims.UserID, claims.Email,
+	).Scan(&pgID, &pgRole)
+	if err == pgx.ErrNoRows {
+		return claims, nil
+	}
+	if err != nil {
+		return claims, nil
+	}
+	claims.UserID = pgID
+	if pgRole != "" {
+		claims.Role = pgRole
+	}
+	return claims, nil
 }
 
 type jwksCache struct {
@@ -165,7 +202,16 @@ func ParseCognitoToken(tokenStr string) (*Claims, error) {
 	if role == "" {
 		role = "worker"
 	}
-	return &Claims{UserID: cc.Sub, Role: role, RegisteredClaims: cc.RegisteredClaims}, nil
+	email := cc.Email
+	if email == "" {
+		email = cc.Username
+	}
+	return &Claims{
+		UserID:           cc.Sub,
+		Email:            email,
+		Role:             role,
+		RegisteredClaims: cc.RegisteredClaims,
+	}, nil
 }
 
 func roleFromGroups(groups []string) string {

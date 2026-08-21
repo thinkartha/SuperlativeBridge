@@ -28,7 +28,7 @@ func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	case strings.HasSuffix(req.Resource, "/dashboard"):
 		return getDashboard(ctx, id)
 	case strings.HasSuffix(req.Resource, "/enrollments"):
-		claims, err := auth.FromRequest(req.Headers)
+	claims, err := auth.FromRequest(ctx, req.Headers)
 		if err != nil {
 			return response.Error(401, "unauthorized"), nil
 		}
@@ -37,7 +37,7 @@ func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		}
 		return getEnrollments(ctx, id)
 	case strings.HasSuffix(req.Resource, "/saved-courses"):
-		claims, err := auth.FromRequest(req.Headers)
+	claims, err := auth.FromRequest(ctx, req.Headers)
 		if err != nil {
 			return response.Error(401, "unauthorized"), nil
 		}
@@ -46,7 +46,7 @@ func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		}
 		return savedcourses.ListForUser(ctx, id)
 	case strings.HasSuffix(req.Resource, "/mentor-bookings"):
-		claims, err := auth.FromRequest(req.Headers)
+	claims, err := auth.FromRequest(ctx, req.Headers)
 		if err != nil {
 			return response.Error(401, "unauthorized"), nil
 		}
