@@ -72,13 +72,34 @@ Globals:
         SecurityGroupIds:
           - !Ref LambdaSecurityGroupId
       - !Ref AWS::NoValue
-    Policies: !If
-      - UseSecretArn
-      - - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref DatabaseUrlSecretArn
-      - !Ref AWS::NoValue
 
 Resources:
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: ReadDatabaseUrlSecret
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !If
+                  - UseSecretArn
+                  - !Ref DatabaseUrlSecretArn
+                  - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:superlativebridge/*
+
   Api:
     Type: AWS::Serverless::Api
     Properties:
@@ -110,6 +131,7 @@ Resources:
     Properties:
       CodeUri: cmd/health/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         Get:
           Type: Api
@@ -127,23 +149,38 @@ Resources:
     Properties:
       CodeUri: cmd/courses/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         List:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/courses, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/courses
         Get:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/courses/{id}, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/courses/{id}
         Create:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/courses, Method: POST }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "POST"
+            Method: /api/courses
         Update:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/courses/{id}, Method: PUT }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "PUT"
+            Method: /api/courses/{id}
         Delete:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/courses/{id}, Method: DELETE }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "DELETE"
+            Method: /api/courses/{id}
   CategoriesFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -151,20 +188,32 @@ Resources:
     Properties:
       CodeUri: cmd/categories/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         List:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/categories, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/categories
         Create:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/categories, Method: POST }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "POST"
+            Method: /api/categories
         Update:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/categories/{id}, Method: PUT }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "PUT"
+            Method: /api/categories/{id}
         Delete:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/categories/{id}, Method: DELETE }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "DELETE"
+            Method: /api/categories/{id}
   MentorsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -172,26 +221,44 @@ Resources:
     Properties:
       CodeUri: cmd/mentors/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         List:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/mentors, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/mentors
         Get:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/mentors/{id}
         Analytics:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}/analytics, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/mentors/{id}/analytics
         Create:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/mentors, Method: POST }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "POST"
+            Method: /api/mentors
         Update:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}, Method: PUT }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "PUT"
+            Method: /api/mentors/{id}
         Delete:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}, Method: DELETE }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "DELETE"
+            Method: /api/mentors/{id}
   UsersFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -199,44 +266,80 @@ Resources:
     Properties:
       CodeUri: cmd/users/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         List:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/users
         Get:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/users/{id}
         Create:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users, Method: POST }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "POST"
+            Method: /api/users
         Update:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}, Method: PUT }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "PUT"
+            Method: /api/users/{id}
         Delete:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}, Method: DELETE }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "DELETE"
+            Method: /api/users/{id}
         Enrollments:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/enrollments, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/users/{id}/enrollments
         Certifications:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/certifications, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/users/{id}/certifications
         Notifications:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/notifications, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/users/{id}/notifications
         Dashboard:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/dashboard, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/users/{id}/dashboard
         SavedCourses:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/saved-courses, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/users/{id}/saved-courses
         MentorBookings:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/mentor-bookings, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/users/{id}/mentor-bookings
         Analytics:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/users/{id}/analytics, Method: GET }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/users/{id}/analytics
   AuthFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -244,6 +347,7 @@ Resources:
     Properties:
       CodeUri: cmd/auth/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         SignIn:
           Type: Api
@@ -277,14 +381,20 @@ Resources:
     Properties:
       CodeUri: cmd/programs/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         List:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/programs, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/programs
         Get:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/programs/{id}, Method: GET }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/programs/{id}
   VisaFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -292,11 +402,14 @@ Resources:
     Properties:
       CodeUri: cmd/visa/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         List:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/visa-programs, Method: GET }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/visa-programs
   EnrollmentsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -304,20 +417,32 @@ Resources:
     Properties:
       CodeUri: cmd/enrollments/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         Create:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/enrollments, Method: POST }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "POST"
+            Method: /api/enrollments
         Update:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/enrollments/{id}, Method: PATCH }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "PATCH"
+            Method: /api/enrollments/{id}
         Delete:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/enrollments/{id}, Method: DELETE }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "DELETE"
+            Method: /api/enrollments/{id}
         QuizAttempts:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/quiz-attempts, Method: POST }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "POST"
+            Method: /api/quiz-attempts
   IntegrationsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -325,23 +450,38 @@ Resources:
     Properties:
       CodeUri: cmd/integrations/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         List:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/integrations, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/integrations
         Get:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/integrations/{id}, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/integrations/{id}
         Put:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/integrations/{id}, Method: PUT }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "PUT"
+            Method: /api/integrations/{id}
         PutPipeline:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/integrations/pipelines/{id}, Method: PUT }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "PUT"
+            Method: /api/integrations/pipelines/{id}
         Run:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/integrations/pipelines/{id}/run, Method: POST }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "POST"
+            Method: /api/integrations/pipelines/{id}/run
   SavedCoursesFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -349,14 +489,20 @@ Resources:
     Properties:
       CodeUri: cmd/savedcourses/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         Create:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/saved-courses, Method: POST }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "POST"
+            Method: /api/saved-courses
         Delete:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/saved-courses/{courseId}, Method: DELETE }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "DELETE"
+            Method: /api/saved-courses/{courseId}
   MentorBookingsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -364,20 +510,32 @@ Resources:
     Properties:
       CodeUri: cmd/mentorbookings/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         Create:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/mentor-bookings, Method: POST }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "POST"
+            Method: /api/mentor-bookings
         Update:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/mentor-bookings/{id}, Method: PATCH }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "PATCH"
+            Method: /api/mentor-bookings/{id}
         Availability:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}/availability, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/mentors/{id}/availability
         Bookings:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/mentors/{id}/bookings, Method: GET }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/mentors/{id}/bookings
   EmployerAnalyticsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -385,14 +543,20 @@ Resources:
     Properties:
       CodeUri: cmd/employeranalytics/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         Analytics:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/employer/analytics, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/employer/analytics
         Export:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/employer/analytics/export, Method: GET }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/employer/analytics/export
   MarketplaceFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -400,11 +564,14 @@ Resources:
     Properties:
       CodeUri: cmd/marketplace/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         List:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/marketplace, Method: GET }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/marketplace
   CommunityFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -412,14 +579,20 @@ Resources:
     Properties:
       CodeUri: cmd/community/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         List:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/community, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/community
         Rsvp:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/community/events/{id}/rsvp, Method: POST }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "POST"
+            Method: /api/community/events/{id}/rsvp
   EntrepreneurshipFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -427,11 +600,14 @@ Resources:
     Properties:
       CodeUri: cmd/entrepreneurship/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         List:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/entrepreneurship, Method: GET }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/entrepreneurship
   CandidatesFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -439,14 +615,20 @@ Resources:
     Properties:
       CodeUri: cmd/candidates/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         List:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/candidates, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/candidates
         Get:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/candidates/{id}, Method: GET }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/candidates/{id}
   AdminFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -454,26 +636,44 @@ Resources:
     Properties:
       CodeUri: cmd/admin/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         Stats:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/admin/stats, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/admin/stats
         AuditLog:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/admin/audit-log, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/admin/audit-log
         UserAnalytics:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/admin/user-analytics, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/admin/user-analytics
         MentorAnalytics:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/admin/mentor-analytics, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/admin/mentor-analytics
         Notifications:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/admin/notifications, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/admin/notifications
         NotificationPatch:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/admin/notifications/{id}, Method: PATCH }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "PATCH"
+            Method: /api/admin/notifications/{id}
   SettingsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -481,14 +681,20 @@ Resources:
     Properties:
       CodeUri: cmd/settings/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         Get:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/settings, Method: GET }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/settings
         Put:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/settings, Method: PUT }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "PUT"
+            Method: /api/settings
   LmsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -496,6 +702,7 @@ Resources:
     Properties:
       CodeUri: cmd/lms/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Events:
         Providers:
           Type: Api
@@ -515,19 +722,24 @@ Resources:
               Authorizer: NONE
         Sync:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/lms/providers/{provider}/sync, Method: POST }
+          Properties:
+            RestApiId: !Ref Api
+            Path: "POST"
+            Method: /api/lms/providers/{provider}/sync
         Webhook:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: /api/lms/webhooks/{provider}
+            Path: "/api/lms/webhooks/{provider}"
             Method: POST
             Auth:
               Authorizer: NONE
         Jobs:
           Type: Api
-          Properties: { RestApiId: !Ref Api, Path: /api/lms/jobs, Method: GET }
-
+          Properties:
+            RestApiId: !Ref Api
+            Path: "GET"
+            Method: /api/lms/jobs
   MigrateFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -535,6 +747,7 @@ Resources:
     Properties:
       CodeUri: cmd/migrate/
       Handler: bootstrap
+      Role: !GetAtt LambdaFunctionRole.Arn
       Timeout: 120
       MemorySize: 512
       Description: Applies embedded SQL migrations against RDS (invoke from CI)

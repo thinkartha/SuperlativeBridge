@@ -1,0 +1,242 @@
+name: Deploy SuperlativeBridge (Azure)
+
+# Bicep → ACR image → Container Apps API → Postgres migrate → Static web
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: prod
+        type: choice
+        options: [dev, staging, prod]
+      skip_infra:
+        description: Skip Bicep (API image + web only)
+        type: boolean
+        default: false
+
+env:
+  AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus' }}
+  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || format('superlativebridge-{0}', github.event.inputs.environment || 'prod') }}
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
+  NODE_VERSION: '22'
+  GO_VERSION: '1.24.x'
+  PGUSER: sbadmin
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+      - name: Go vet / build
+        working-directory: backend
+        run: |
+          go vet ./...
+          go build ./...
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_API_BASE_URL: https://example.invalid
+
+  deploy-infra:
+    needs: validate
+    if: ${{ github.event.inputs.skip_infra != 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      acr_name: ${{ steps.outs.outputs.acr_name }}
+      acr_login: ${{ steps.outs.outputs.acr_login }}
+      api_name: ${{ steps.outs.outputs.api_name }}
+      api_url: ${{ steps.outs.outputs.api_url }}
+      pg_fqdn: ${{ steps.outs.outputs.pg_fqdn }}
+      db_name: ${{ steps.outs.outputs.db_name }}
+      web_storage: ${{ steps.outs.outputs.web_storage }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Ensure resource group
+        run: az group create --name "$RESOURCE_GROUP" --location "$AZURE_LOCATION" --output none
+      - name: Deploy Bicep
+        run: |
+          set -euo pipefail
+          az deployment group create \
+            --name "sb-infra-${ENVIRONMENT}-$(date +%s)" \
+            --resource-group "$RESOURCE_GROUP" \
+            --template-file infra/azure/main.bicep \
+            --parameters infra/azure/main.parameters.json \
+            --parameters \
+              environment="$ENVIRONMENT" \
+              location="$AZURE_LOCATION" \
+              postgresAdminPassword="${{ secrets.AZURE_PG_PASSWORD }}" \
+              jwtSecret="${{ secrets.JWT_SECRET }}" \
+              lmsApiKey="${{ secrets.LMS_API_KEY }}" \
+              integrationWebhookSecret="${{ secrets.INTEGRATION_WEBHOOK_SECRET }}" \
+            --query properties.outputs -o json > /tmp/bicep-outs.json
+          cat /tmp/bicep-outs.json
+      - name: Export outputs
+        id: outs
+        run: |
+          j() { python3 -c "import json; d=json.load(open('/tmp/bicep-outs.json')); print(d.get('$1',{}).get('value',''))"; }
+          echo "acr_name=$(j acrName)" >> "$GITHUB_OUTPUT"
+          echo "acr_login=$(j acrLoginServer)" >> "$GITHUB_OUTPUT"
+          echo "api_name=$(j apiName)" >> "$GITHUB_OUTPUT"
+          echo "api_url=$(j apiUrl)" >> "$GITHUB_OUTPUT"
+          echo "pg_fqdn=$(j postgresFqdn)" >> "$GITHUB_OUTPUT"
+          echo "db_name=$(j databaseName)" >> "$GITHUB_OUTPUT"
+          echo "web_storage=$(j webStorageAccountName)" >> "$GITHUB_OUTPUT"
+
+  deploy-api:
+    needs: [validate, deploy-infra]
+    if: always() && needs.validate.result == 'success' && (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
+    runs-on: ubuntu-latest
+    outputs:
+      api_url: ${{ steps.meta.outputs.api_url }}
+      web_storage: ${{ steps.meta.outputs.web_storage }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Resolve infra outputs
+        id: meta
+        run: |
+          if [[ "${{ needs.deploy-infra.result }}" == "success" ]]; then
+            echo "acr_name=${{ needs.deploy-infra.outputs.acr_name }}" >> "$GITHUB_OUTPUT"
+            echo "acr_login=${{ needs.deploy-infra.outputs.acr_login }}" >> "$GITHUB_OUTPUT"
+            echo "api_name=${{ needs.deploy-infra.outputs.api_name }}" >> "$GITHUB_OUTPUT"
+            echo "api_url=${{ needs.deploy-infra.outputs.api_url }}" >> "$GITHUB_OUTPUT"
+            echo "pg_fqdn=${{ needs.deploy-infra.outputs.pg_fqdn }}" >> "$GITHUB_OUTPUT"
+            echo "db_name=${{ needs.deploy-infra.outputs.db_name }}" >> "$GITHUB_OUTPUT"
+            echo "web_storage=${{ needs.deploy-infra.outputs.web_storage }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "acr_name=$(az acr list -g "$RESOURCE_GROUP" --query '[0].name' -o tsv)" >> "$GITHUB_OUTPUT"
+            echo "acr_login=$(az acr list -g "$RESOURCE_GROUP" --query '[0].loginServer' -o tsv)" >> "$GITHUB_OUTPUT"
+            echo "api_name=$(az containerapp list -g "$RESOURCE_GROUP" --query "[?contains(name, 'api')].name | [0]" -o tsv)" >> "$GITHUB_OUTPUT"
+            FQDN=$(az containerapp list -g "$RESOURCE_GROUP" --query "[?contains(name, 'api')].properties.configuration.ingress.fqdn | [0]" -o tsv)
+            echo "api_url=https://${FQDN}" >> "$GITHUB_OUTPUT"
+            echo "pg_fqdn=$(az postgres flexible-server list -g "$RESOURCE_GROUP" --query '[0].fullyQualifiedDomainName' -o tsv)" >> "$GITHUB_OUTPUT"
+            echo "db_name=superlativebridge" >> "$GITHUB_OUTPUT"
+            echo "web_storage=$(az storage account list -g "$RESOURCE_GROUP" --query '[0].name' -o tsv)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build & push API image to ACR
+        run: |
+          set -euo pipefail
+          ACR="${{ steps.meta.outputs.acr_name }}"
+          LOGIN="${{ steps.meta.outputs.acr_login }}"
+          IMAGE="${LOGIN}/superlativebridge-api:${{ github.sha }}"
+          az acr login --name "$ACR"
+          docker build -t "$IMAGE" -f backend/Dockerfile backend
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Point Container App at new image + secrets
+        run: |
+          set -euo pipefail
+          APP="${{ steps.meta.outputs.api_name }}"
+          DSN="postgres://${PGUSER}:${{ secrets.AZURE_PG_PASSWORD }}@${{ steps.meta.outputs.pg_fqdn }}:5432/${{ steps.meta.outputs.db_name }}?sslmode=require"
+          az containerapp secret set \
+            --name "$APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --secrets \
+              "database-url=${DSN}" \
+              "jwt-secret=${{ secrets.JWT_SECRET }}" \
+              "lms-api-key=${{ secrets.LMS_API_KEY }}" \
+              "webhook-secret=${{ secrets.INTEGRATION_WEBHOOK_SECRET }}" \
+            --output none
+          az containerapp update \
+            --name "$APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "$IMAGE" \
+            --set-env-vars \
+              "PORT=8081" \
+              "ENVIRONMENT=${ENVIRONMENT}" \
+              "CORS_ALLOW_ORIGIN=*" \
+              "DATABASE_URL=secretref:database-url" \
+              "JWT_SECRET=secretref:jwt-secret" \
+              "LMS_API_KEY=secretref:lms-api-key" \
+              "INTEGRATION_WEBHOOK_SECRET=secretref:webhook-secret" \
+            --output none
+
+      - name: Run Postgres migrations
+        env:
+          PGPASSWORD: ${{ secrets.AZURE_PG_PASSWORD }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          HOST="${{ steps.meta.outputs.pg_fqdn }}"
+          DB="${{ steps.meta.outputs.db_name }}"
+          for f in backend/migrations/*.sql; do
+            echo "Applying $f"
+            psql "host=${HOST} port=5432 dbname=${DB} user=${PGUSER} sslmode=require" -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+  deploy-web:
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - run: npm ci
+      - name: Build SPA
+        env:
+          VITE_API_BASE_URL: ${{ needs.deploy-api.outputs.api_url }}
+          VITE_AUTH_MODE: jwt
+        run: npm run build
+      - name: Enable static website + upload
+        run: |
+          set -euo pipefail
+          STG="${{ needs.deploy-api.outputs.web_storage }}"
+          KEY=$(az storage account keys list -n "$STG" -g "$RESOURCE_GROUP" --query '[0].value' -o tsv)
+          az storage blob service-properties update \
+            --account-name "$STG" \
+            --account-key "$KEY" \
+            --static-website \
+            --index-document index.html \
+            --404-document index.html
+          az storage blob upload-batch \
+            --account-name "$STG" \
+            --account-key "$KEY" \
+            --destination '$web' \
+            --source dist \
+            --overwrite
+          WEB=$(az storage account show -n "$STG" -g "$RESOURCE_GROUP" --query 'primaryEndpoints.web' -o tsv)
+          echo "Website: $WEB"
+          echo "API: ${{ needs.deploy-api.outputs.api_url }}"
+
+  smoke:
+    needs: [deploy-api, deploy-web]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check
+        run: |
+          set -euo pipefail
+          URL="${{ needs.deploy-api.outputs.api_url }}"
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS "$URL/api/health" | tee /tmp/health.json; then
+              break
+            fi
+            sleep 15
+          done
+          grep -Eq 'ok' /tmp/health.json
