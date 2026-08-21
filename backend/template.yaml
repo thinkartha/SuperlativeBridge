@@ -155,32 +155,32 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/courses
+            Path: "/api/courses"
+            Method: GET
         Get:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/courses/{id}
+            Path: "/api/courses/{id}"
+            Method: GET
         Create:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "POST"
-            Method: /api/courses
+            Path: "/api/courses"
+            Method: POST
         Update:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "PUT"
-            Method: /api/courses/{id}
+            Path: "/api/courses/{id}"
+            Method: PUT
         Delete:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "DELETE"
-            Method: /api/courses/{id}
+            Path: "/api/courses/{id}"
+            Method: DELETE
   CategoriesFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -194,26 +194,26 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/categories
+            Path: "/api/categories"
+            Method: GET
         Create:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "POST"
-            Method: /api/categories
+            Path: "/api/categories"
+            Method: POST
         Update:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "PUT"
-            Method: /api/categories/{id}
+            Path: "/api/categories/{id}"
+            Method: PUT
         Delete:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "DELETE"
-            Method: /api/categories/{id}
+            Path: "/api/categories/{id}"
+            Method: DELETE
   MentorsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -227,38 +227,38 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/mentors
+            Path: "/api/mentors"
+            Method: GET
         Get:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/mentors/{id}
+            Path: "/api/mentors/{id}"
+            Method: GET
         Analytics:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/mentors/{id}/analytics
+            Path: "/api/mentors/{id}/analytics"
+            Method: GET
         Create:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "POST"
-            Method: /api/mentors
+            Path: "/api/mentors"
+            Method: POST
         Update:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "PUT"
-            Method: /api/mentors/{id}
+            Path: "/api/mentors/{id}"
+            Method: PUT
         Delete:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "DELETE"
-            Method: /api/mentors/{id}
+            Path: "/api/mentors/{id}"
+            Method: DELETE
   UsersFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -272,74 +272,74 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/users
+            Path: "/api/users"
+            Method: GET
         Get:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/users/{id}
+            Path: "/api/users/{id}"
+            Method: GET
         Create:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "POST"
-            Method: /api/users
+            Path: "/api/users"
+            Method: POST
         Update:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "PUT"
-            Method: /api/users/{id}
+            Path: "/api/users/{id}"
+            Method: PUT
         Delete:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "DELETE"
-            Method: /api/users/{id}
+            Path: "/api/users/{id}"
+            Method: DELETE
         Enrollments:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/users/{id}/enrollments
+            Path: "/api/users/{id}/enrollments"
+            Method: GET
         Certifications:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/users/{id}/certifications
+            Path: "/api/users/{id}/certifications"
+            Method: GET
         Notifications:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/users/{id}/notifications
+            Path: "/api/users/{id}/notifications"
+            Method: GET
         Dashboard:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/users/{id}/dashboard
+            Path: "/api/users/{id}/dashboard"
+            Method: GET
         SavedCourses:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/users/{id}/saved-courses
+            Path: "/api/users/{id}/saved-courses"
+            Method: GET
         MentorBookings:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/users/{id}/mentor-bookings
+            Path: "/api/users/{id}/mentor-bookings"
+            Method: GET
         Analytics:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/users/{id}/analytics
+            Path: "/api/users/{id}/analytics"
+            Method: GET
   AuthFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -387,14 +387,14 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/programs
+            Path: "/api/programs"
+            Method: GET
         Get:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/programs/{id}
+            Path: "/api/programs/{id}"
+            Method: GET
   VisaFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -408,8 +408,8 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/visa-programs
+            Path: "/api/visa-programs"
+            Method: GET
   EnrollmentsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -423,26 +423,26 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "POST"
-            Method: /api/enrollments
+            Path: "/api/enrollments"
+            Method: POST
         Update:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "PATCH"
-            Method: /api/enrollments/{id}
+            Path: "/api/enrollments/{id}"
+            Method: PATCH
         Delete:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "DELETE"
-            Method: /api/enrollments/{id}
+            Path: "/api/enrollments/{id}"
+            Method: DELETE
         QuizAttempts:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "POST"
-            Method: /api/quiz-attempts
+            Path: "/api/quiz-attempts"
+            Method: POST
   IntegrationsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -456,32 +456,32 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/integrations
+            Path: "/api/integrations"
+            Method: GET
         Get:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/integrations/{id}
+            Path: "/api/integrations/{id}"
+            Method: GET
         Put:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "PUT"
-            Method: /api/integrations/{id}
+            Path: "/api/integrations/{id}"
+            Method: PUT
         PutPipeline:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "PUT"
-            Method: /api/integrations/pipelines/{id}
+            Path: "/api/integrations/pipelines/{id}"
+            Method: PUT
         Run:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "POST"
-            Method: /api/integrations/pipelines/{id}/run
+            Path: "/api/integrations/pipelines/{id}/run"
+            Method: POST
   SavedCoursesFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -495,14 +495,14 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "POST"
-            Method: /api/saved-courses
+            Path: "/api/saved-courses"
+            Method: POST
         Delete:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "DELETE"
-            Method: /api/saved-courses/{courseId}
+            Path: "/api/saved-courses/{courseId}"
+            Method: DELETE
   MentorBookingsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -516,26 +516,26 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "POST"
-            Method: /api/mentor-bookings
+            Path: "/api/mentor-bookings"
+            Method: POST
         Update:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "PATCH"
-            Method: /api/mentor-bookings/{id}
+            Path: "/api/mentor-bookings/{id}"
+            Method: PATCH
         Availability:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/mentors/{id}/availability
+            Path: "/api/mentors/{id}/availability"
+            Method: GET
         Bookings:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/mentors/{id}/bookings
+            Path: "/api/mentors/{id}/bookings"
+            Method: GET
   EmployerAnalyticsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -549,14 +549,14 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/employer/analytics
+            Path: "/api/employer/analytics"
+            Method: GET
         Export:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/employer/analytics/export
+            Path: "/api/employer/analytics/export"
+            Method: GET
   MarketplaceFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -570,8 +570,8 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/marketplace
+            Path: "/api/marketplace"
+            Method: GET
   CommunityFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -585,14 +585,14 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/community
+            Path: "/api/community"
+            Method: GET
         Rsvp:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "POST"
-            Method: /api/community/events/{id}/rsvp
+            Path: "/api/community/events/{id}/rsvp"
+            Method: POST
   EntrepreneurshipFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -606,8 +606,8 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/entrepreneurship
+            Path: "/api/entrepreneurship"
+            Method: GET
   CandidatesFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -621,14 +621,14 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/candidates
+            Path: "/api/candidates"
+            Method: GET
         Get:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/candidates/{id}
+            Path: "/api/candidates/{id}"
+            Method: GET
   AdminFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -642,38 +642,38 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/admin/stats
+            Path: "/api/admin/stats"
+            Method: GET
         AuditLog:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/admin/audit-log
+            Path: "/api/admin/audit-log"
+            Method: GET
         UserAnalytics:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/admin/user-analytics
+            Path: "/api/admin/user-analytics"
+            Method: GET
         MentorAnalytics:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/admin/mentor-analytics
+            Path: "/api/admin/mentor-analytics"
+            Method: GET
         Notifications:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/admin/notifications
+            Path: "/api/admin/notifications"
+            Method: GET
         NotificationPatch:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "PATCH"
-            Method: /api/admin/notifications/{id}
+            Path: "/api/admin/notifications/{id}"
+            Method: PATCH
   SettingsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -687,14 +687,14 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/settings
+            Path: "/api/settings"
+            Method: GET
         Put:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "PUT"
-            Method: /api/settings
+            Path: "/api/settings"
+            Method: PUT
   LmsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -724,8 +724,8 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "POST"
-            Method: /api/lms/providers/{provider}/sync
+            Path: "/api/lms/providers/{provider}/sync"
+            Method: POST
         Webhook:
           Type: Api
           Properties:
@@ -738,8 +738,8 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
-            Path: "GET"
-            Method: /api/lms/jobs
+            Path: "/api/lms/jobs"
+            Method: GET
   MigrateFunction:
     Type: AWS::Serverless::Function
     Metadata:

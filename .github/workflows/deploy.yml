@@ -175,6 +175,11 @@ jobs:
         run: |
           CORS="'${{ steps.infra.outputs.website_url }}'"
           [[ -z "${{ steps.infra.outputs.website_url }}" || "${{ steps.infra.outputs.website_url }}" == "None" ]] && CORS="'*'"
+          # SAM Cors.AllowOrigin expects a quoted string literal, e.g. 'https://example.com'
+          case "$CORS" in
+            \'*\') ;;
+            *) CORS="'${CORS}'" ;;
+          esac
           # Empty secrets break sam --parameter-overrides; fall back to placeholders.
           JWT_SECRET="${JWT_SECRET:-change-me-jwt-secret}"
           LMS_API_KEY="${LMS_API_KEY:-unset}"
